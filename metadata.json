@@ -1,0 +1,8 @@
+{
+  "name": "site Jeferson carlos",
+  "description": "Página oficial de captação de revendedoras de lingerie consignada e catálogo Favorita para Romance Itapema, com cadastro seguro LGPD e painel administrativo para controle total de pedidos e acertos de 40 dias.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}

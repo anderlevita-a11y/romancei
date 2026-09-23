@@ -1,0 +1,70 @@
+{
+  "id": "/",
+  "name": "Romance Itapema | Revendedora de Lingerie",
+  "short_name": "Romance",
+  "description": "Seja uma revendedora Romance Itapema sem investimento inicial com até 40% de lucro líquido.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#fff1f2",
+  "theme_color": "#e11d48",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["business", "shopping", "lifestyle"],
+  "icons": [
+    {
+      "src": "/pwa-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    },
+    {
+      "src": "/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icon.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Fazer Pré-Cadastro",
+      "short_name": "Cadastro",
+      "description": "Cadastre-se como revendedora sem investimento inicial",
+      "url": "/#cadastro",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Simulador de Lucro",
+      "short_name": "Simulador",
+      "description": "Calcule seu lucro de 30% a 40%",
+      "url": "/#calculadora",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Linhas Comerciais",
+      "short_name": "Produtos",
+      "description": "Conheça nossas 7 linhas oficiais",
+      "url": "/#produtos",
+      "icons": [{ "src": "/pwa-192x192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

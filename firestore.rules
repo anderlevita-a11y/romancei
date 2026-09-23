@@ -1,0 +1,29 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Cadastro de novas revendedoras (leads)
+    match /leads/{leadId} {
+      allow read, write: if true;
+    }
+    
+    // Gestão de kits consignados e acertos
+    match /orders/{orderId} {
+      allow read, write: if true;
+    }
+
+    // Configurações do distribuidor e regras de comissão
+    match /settings/{settingId} {
+      allow read, write: if true;
+    }
+
+    // Gestão de contas de administradores
+    match /admin_users/{userId} {
+      allow read, write: if true;
+    }
+
+    // Gestão de fotos, vídeos e novidades do carrossel
+    match /media_items/{mediaId} {
+      allow read, write: if true;
+    }
+  }
+}

@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Service Worker & Cache Cleaner: desregistra SWs legados e purga caches para evitar instâncias duplicadas de React -->
+    <script>
+      (function() {
+        if (typeof window !== 'undefined') {
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(function(regs) {
+              for (var i = 0; i < regs.length; i++) regs[i].unregister();
+            }).catch(function() {});
+          }
+          if ('caches' in window) {
+            caches.keys().then(function(keys) {
+              for (var i = 0; i < keys.length; i++) caches.delete(keys[i]);
+            }).catch(function() {});
+          }
+        }
+      })();
+    </script>
+    
+    <!-- Primary Page Metadata & SEO -->
+    <title>Romance Itapema | Seja uma Revendedora de Lingerie Sem Investimento</title>
+    <meta name="description" content="Ganhe de 30% a 40% de lucro revendendo Lingerie Sem Investimento e Catálogo Favorita com a Romance Itapema. Zero investimento inicial, só pague o que vender e acertos a cada 40 dias." />
+    <meta name="keywords" content="revendedora lingerie, consignado lingerie, romance itapema, renda extra, catalogo favorita, lingerie sem investimento" />
+    <meta name="author" content="Romance Itapema - Distribuição Oficial" />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="theme-color" content="#e11d48" />
+
+    <!-- PWA & Mobile Web App Manifest -->
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="Romance" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="application-name" content="Romance Itapema" />
+
+    <!-- Canonical URL -->
+    <link rel="canonical" href="https://romanceitapema.com.br/" />
+
+    <!-- Open Graph / Facebook / WhatsApp Meta Tags -->
+    <meta property="og:site_name" content="Romance Itapema - Distribuição Oficial" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://romanceitapema.com.br/" />
+    <meta property="og:title" content="Romance Itapema | Lingerie Sem Investimento - Seja Revendedora" />
+    <meta property="og:description" content="Sem investimento inicial. Só pague o que vender, o que não vender você devolve. Acertos a cada 40 dias e de 30% a 40% de lucro líquido em Itapema e região." />
+    <meta property="og:image" content="https://images.unsplash.com/photo-1574634534894-89d7576c8259?auto=format&fit=crop&w=1200&h=630&q=85" />
+    <meta property="og:image:secure_url" content="https://images.unsplash.com/photo-1574634534894-89d7576c8259?auto=format&fit=crop&w=1200&h=630&q=85" />
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Romance Itapema - Mostruário de Lingerie Sem Investimento e Catálogo Favorita" />
+    <meta property="og:locale" content="pt_BR" />
+
+    <!-- Twitter Card Meta Tags -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:url" content="https://romanceitapema.com.br/" />
+    <meta name="twitter:title" content="Romance Itapema | Seja Revendedora Sem Investimento" />
+    <meta name="twitter:description" content="Sem investimento inicial: pegue o mostruário montado, lucre até 40% e pague apenas pelo que vender após 40 dias." />
+    <meta name="twitter:image" content="https://images.unsplash.com/photo-1574634534894-89d7576c8259?auto=format&fit=crop&w=1200&h=630&q=85" />
+    <meta name="twitter:image:alt" content="Romance Itapema - Lingeries e Catálogo Favorita" />
+
+    <!-- Web Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,600;0,700;1,600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Structured Data: Schema.org (LocalBusiness & FAQPage JSON-LD) -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@graph": [
+        {
+          "@type": ["LocalBusiness", "WholesaleStore"],
+          "@id": "https://romanceitapema.com.br/#business",
+          "name": "Romance Itapema - Distribuição Oficial",
+          "alternateName": "Romance Moda Íntima & Catálogo Favorita Itapema",
+          "description": "Distribuição oficial de moda íntima, fitness e Catálogo Favorita sem investimento em Itapema, Itajaí, Balneário Camboriú, Navegantes e região. Sem investimento inicial e com acerto a cada 40 dias.",
+          "url": "https://romanceitapema.com.br/",
+          "telephone": "+55-47-99762-6121",
+          "priceRange": "$$",
+          "currenciesAccepted": "BRL",
+          "paymentAccepted": "Cash, Credit Card, PIX",
+          "image": "https://images.unsplash.com/photo-1574634534894-89d7576c8259?auto=format&fit=crop&w=1200&h=630&q=85",
+          "logo": "https://romanceitapema.com.br/images/romance_brand_logo.jpg",
+          "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "Rua Vereador Ailton de Souza, 257, Sala 03",
+            "addressLocality": "Itajaí",
+            "addressRegion": "SC",
+            "postalCode": "88309-120",
+            "addressCountry": "BR"
+          },
+          "geo": {
+            "@type": "GeoCoordinates",
+            "latitude": -26.9078,
+            "longitude": -48.6619
+          },
+          "openingHoursSpecification": [
+            {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"],
+              "opens": "08:30",
+              "closes": "18:00"
+            },
+            {
+              "@type": "OpeningHoursSpecification",
+              "dayOfWeek": "Saturday",
+              "opens": "08:30",
+              "closes": "12:30"
+            }
+          ],
+          "areaServed": [
+            { "@type": "City", "name": "Itapema" },
+            { "@type": "City", "name": "Itajaí" },
+            { "@type": "City", "name": "Balneário Camboriú" },
+            { "@type": "City", "name": "Camboriú" },
+            { "@type": "City", "name": "Navegantes" },
+            { "@type": "City", "name": "Penha" },
+            { "@type": "City", "name": "Balneário Piçarras" },
+            { "@type": "City", "name": "Araquari" },
+            { "@type": "City", "name": "Joinville" }
+          ],
+          "aggregateRating": {
+            "@type": "AggregateRating",
+            "ratingValue": "5.0",
+            "reviewCount": "148",
+            "bestRating": "5",
+            "worstRating": "1"
+          }
+        },
+        {
+          "@type": "FAQPage",
+          "@id": "https://romanceitapema.com.br/#faq",
+          "mainEntity": [
+            {
+              "@type": "Question",
+              "name": "O que significa revender sem investimento na Romance Itapema?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Revender sem investimento significa que você recebe um kit com os nossos produtos (lingeries finas, peças para o dia a dia, moda fitness e linha noite) sem precisar comprar as peças com antecedência. Você terá um prazo de 40 dias para oferecer os produtos às suas clientes. No dia do acerto, você paga apenas pelo que vendeu e devolve o restante para nós, sem pagar nada pelas peças não comercializadas."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Preciso fazer algum investimento inicial ou comprar um kit para começar?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Não! O nosso modelo é 100% focado no seu sucesso e sem riscos para o seu bolso. Você não paga absolutamente nada para retirar ou receber o seu mostruário. O seu único investimento será o seu tempo e a sua dedicação às vendas."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "O que acontece com as peças que eu não conseguir vender?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Como trabalhamos com modelo sem investimento, as peças que não forem vendidas até o dia do seu acerto são simplesmente devolvidas à Romance Itapema, sem nenhum custo extra, multa ou taxa para você. Você não fica com estoque parado nem mercadoria encalhada."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Qual será a minha margem de lucro e como funciona o ganho de 30% a 40%?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "As revendedoras Romance possuem uma das maiores margens de lucro do mercado. O lucro inicial básico é de 30% sobre todas as peças vendidas do kit sem investimento. Para elevar seu lucro para 40% em todo o kit, basta realizar um pedido do Catálogo Favorita entre o mínimo de R$ 400,00 e o máximo de R$ 600,00 no seu primeiro pedido."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Como funciona a regra do Catálogo Favorita para liberar os 40% de lucro?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "O Catálogo Favorita reúne cosméticos, maquiagens, perfumaria e utilidades. Para desbloquear o lucro máximo de 40% no seu primeiro ciclo, você realiza um pedido do catálogo com valor mínimo de R$ 400,00 e limite de R$ 600,00. Assim, tanto as lingeries quanto os itens Favorita passam a render 40% de lucro líquido para você."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Como e quando é feito o acerto das peças? Como recebo meu lucro?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "O prazo de permanência com a sua sacola para vendas é de 40 dias corridos. Na data agendada para o seu acerto, a equipe conta com você as peças restantes, calcula o total vendido, e você retira o seu lucro de 30% ou 40% na hora, repassando apenas o valor de custo."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Quais são as regras e cuidados obrigatórios com as peças sem investimento?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Para manter a qualidade: não devolver peças sujas ou com maquiagem/desodorante, não dobrar nem amassar os bojos dos sutiãs, manter tags e etiquetas intactas com código de barras, proteger contra odores e umidade, e devolver cada item dentro da embalagem plástica original."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Como organizar e transportar a maleta de mostruário no dia a dia?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Recomendamos manter a sacola sempre em local seco e arejado, longe da luz solar direta. Ao transportar, acomode os conjuntos delicados por cima das peças mais pesadas para não comprimir os bojos."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Posso escolher as peças que vêm na minha mala sem investimento?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "A montagem do primeiro kit é feita com base nas peças mais vendidas (best-sellers comprovados). A partir do segundo kit, você pode passar o perfil das suas clientes para personalizar a sacola com tamanhos plus size, mais fitness, lingeries sensuais ou moda casual."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Quais produtos e linhas a Romance Moda oferece para revenda?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "A Romance oferece lingeries finas em renda com aro e strappy, básicos do dia a dia sem costura, moda fitness de alta compressão, linha noite e pijamas, moda íntima masculina e o Catálogo Favorita de cosméticos e utilidades."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Quais são os requisitos para me tornar uma revendedora Romance Itapema?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Ser maior de 18 anos, possuir CPF e RG válidos, ter comprovante de residência atualizado e residir nas cidades e regiões atendidas pela nossa distribuição."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Como funciona a aprovação do meu pré-cadastro?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Todos os cadastros passam por análise cadastral e de perfil realizada pelo setor responsável, sujeitos à aprovação conforme os critérios internos da empresa."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Como faço o meu pré-cadastro e em quanto tempo recebo a sacola?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Preencha o formulário online nesta página com seus dados. Nossa equipe entrará em contato via WhatsApp para confirmar seus dados e agendar a entrega ou retirada da sua sacola (habitualmente em 2 a 5 dias úteis)."
+              }
+            },
+            {
+              "@type": "Question",
+              "name": "Como os meus dados pessoais são protegidos segundo a LGPD?",
+              "acceptedAnswer": {
+                "@type": "Answer",
+                "text": "Em total conformidade com a Lei Geral de Proteção de Dados (Lei nº 13.709/2018), coletamos apenas os dados estritamente necessários para validação e formalização da revenda. Seus dados são mantidos em sigilo e nunca repassados a terceiros para marketing."
+              }
+            }
+          ]
+        }
+      ]
+    }
+    </script>
+  </head>
+  <body class="bg-rose-50/30 text-stone-900 font-sans antialiased selection:bg-rose-500 selection:text-white">
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
+

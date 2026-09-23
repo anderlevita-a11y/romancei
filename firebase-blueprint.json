@@ -1,0 +1,144 @@
+{
+  "entities": {
+    "Lead": {
+      "title": "Lead",
+      "description": "Pré-cadastro de revendedora de lingerie consignada Romance e Catálogo Favorita em Itapema e região.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Identificador único do lead" },
+        "protocol": { "type": "string", "description": "Protocolo de atendimento gerado automaticamente" },
+        "fullName": { "type": "string", "description": "Nome completo da candidata a revendedora" },
+        "cpf": { "type": "string", "description": "CPF formatado para validação de crédito e consignado" },
+        "birthDate": { "type": "string", "description": "Data de nascimento no formato DD/MM/AAAA" },
+        "age": { "type": "number", "description": "Idade calculada (mínimo 18 anos)" },
+        "phone": { "type": "string", "description": "WhatsApp com DDD para contato da distribuidora" },
+        "city": { "type": "string", "description": "Cidade e bairro de atuação (Itapema, Balneário Camboriú, Porto Belo, Tijucas, etc.)" },
+        "neighborhood": { "type": "string", "description": "Bairro de residência" },
+        "hasExperience": { "type": "string", "enum": ["sim", "nao"], "description": "Se já vendeu produtos por catálogo ou consignado" },
+        "wantsFavorita40": { "type": "string", "enum": ["sim", "nao"], "description": "Se deseja incluir o Catálogo Favorita para comissão de 40%" },
+        "consentLgpd": { "type": "boolean", "description": "Autorização expressa de tratamento de dados LGPD" },
+        "termsAccepted": { "type": "boolean", "description": "Aceite dos termos de consignação e ciclo de 40 dias" },
+        "consentTimestamp": { "type": "string", "format": "date-time", "description": "Data e hora do consentimento digital" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Data e hora do pré-cadastro" },
+        "status": { 
+          "type": "string", 
+          "enum": ["novo", "em_analise", "aprovado", "kit_entregue", "acerto_realizado", "recusado", "arquivado"], 
+          "description": "Status operacional do lead no funil de atendimento" 
+        },
+        "score": { "type": "string", "enum": ["alto", "medio", "baixo"], "description": "Classificação de potencial do lead" }
+      },
+      "required": ["id", "protocol", "fullName", "cpf", "birthDate", "phone", "city", "termsAccepted", "consentLgpd", "createdAt", "status"]
+    },
+    "ConsignmentOrder": {
+      "title": "ConsignmentOrder",
+      "description": "Controle de mostruário consignado entregue à revendedora com ciclo de 40 dias.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Identificador único do pedido" },
+        "code": { "type": "string", "description": "Código do pedido consignado (ex: ORD-101)" },
+        "leadId": { "type": "string", "description": "ID do lead correspondente ou manual" },
+        "resellerName": { "type": "string", "description": "Nome da revendedora" },
+        "resellerCpf": { "type": "string", "description": "CPF da revendedora" },
+        "resellerPhone": { "type": "string", "description": "Telefone/WhatsApp da revendedora" },
+        "resellerCity": { "type": "string", "description": "Cidade de atendimento" },
+        "kitAmount": { "type": "number", "description": "Valor total das peças de lingerie consignadas Romance (R$)" },
+        "favoritaAmount": { "type": "number", "description": "Valor de pedido de cosméticos e utilidades Favorita (R$)" },
+        "totalConsigned": { "type": "number", "description": "Valor total consignado sob responsabilidade da revendedora (R$)" },
+        "commissionRate": { "type": "number", "enum": [0.30, 0.40], "description": "Taxa de comissão aplicada (30% ou 40%)" },
+        "deliveryDate": { "type": "string", "format": "date-time", "description": "Data de entrega da sacola" },
+        "dueDate": { "type": "string", "format": "date-time", "description": "Data limite do acerto (40 dias)" },
+        "status": { 
+          "type": "string", 
+          "enum": ["ativo", "acerto_proximo", "acerto_atrasado", "finalizado", "cancelado"], 
+          "description": "Situação do ciclo de 40 dias" 
+        }
+      },
+      "required": ["id", "code", "resellerName", "resellerCpf", "resellerPhone", "totalConsigned", "commissionRate", "deliveryDate", "dueDate", "status"]
+    },
+    "BusinessSettings": {
+      "title": "BusinessSettings",
+      "description": "Configurações da distribuidora Romance Itapema, WhatsApp oficial e modelos de mensagem.",
+      "type": "object",
+      "properties": {
+        "businessName": { "type": "string", "description": "Nome fantasia da distribuidora" },
+        "distributorName": { "type": "string", "description": "Nome do distribuidor oficial responsável" },
+        "officialWhatsApp": { "type": "string", "description": "Número do WhatsApp oficial com código do país e DDD" },
+        "displayWhatsApp": { "type": "string", "description": "Número do WhatsApp formatado para visualização" },
+        "cityRegion": { "type": "string", "description": "Região de atendimento em Santa Catarina" },
+        "instagramHandle": { "type": "string", "description": "Perfil oficial no Instagram" },
+        "cycleDays": { "type": "number", "description": "Duração padrão do ciclo de consignação (40 dias)" },
+        "baseCommission": { "type": "number", "description": "Percentual de comissão base Romance (30%)" },
+        "maxCommission": { "type": "number", "description": "Percentual de comissão com Favorita (40%)" }
+      },
+      "required": ["businessName", "officialWhatsApp", "displayWhatsApp", "cycleDays", "baseCommission", "maxCommission"]
+    },
+    "AdminUser": {
+      "title": "AdminUser",
+      "description": "Usuários e administradores autorizados com acesso ao painel da distribuidora.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Identificador do administrador" },
+        "name": { "type": "string", "description": "Nome do administrador" },
+        "email": { "type": "string", "format": "email", "description": "E-mail de login" },
+        "role": { 
+          "type": "string", 
+          "enum": ["distribuidor", "administrador", "gerente", "atendimento"], 
+          "description": "Função no painel da distribuidora" 
+        },
+        "password": { "type": "string", "description": "Senha de acesso" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Data de criação do acesso" },
+        "isDefaultTest": { "type": "boolean", "description": "Indica se é a conta inicial de demonstração" }
+      },
+      "required": ["id", "name", "email", "role", "password", "createdAt"]
+    },
+    "MediaItem": {
+      "title": "MediaItem",
+      "description": "Fotos, vídeos, coleções e novidades para exibição no carrossel e catálogo da distribuidora.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Identificador único da mídia" },
+        "title": { "type": "string", "description": "Título da mídia ou novidade" },
+        "subtitle": { "type": "string", "description": "Subtítulo explicativo" },
+        "type": { "type": "string", "enum": ["photo", "video"], "description": "Tipo de mídia (foto ou vídeo)" },
+        "category": { "type": "string", "enum": ["novidades", "lingerie", "favorita", "fitness", "campanha", "depoimento"], "description": "Categoria da mídia" },
+        "categoryLabel": { "type": "string", "description": "Rótulo legível da categoria" },
+        "mediaUrl": { "type": "string", "format": "uri", "description": "URL da imagem em alta resolução ou arquivo de vídeo" },
+        "posterUrl": { "type": "string", "format": "uri", "description": "Thumbnail ou imagem de capa" },
+        "description": { "type": "string", "description": "Descrição detalhada dos produtos e benefícios" },
+        "tag": { "type": "string", "description": "Tag promocional (ex: Lançamento 2026, 40% Lucro)" },
+        "badgeColor": { "type": "string", "enum": ["rose", "amber", "emerald", "purple", "blue"], "description": "Cor de destaque do badge" },
+        "duration": { "type": "string", "description": "Duração do vídeo (ex: 01:15)" },
+        "linkText": { "type": "string", "description": "Texto do botão de ação" },
+        "linkAction": { "type": "string", "enum": ["form", "whatsapp", "external"], "description": "Ação ao clicar no botão" },
+        "externalUrl": { "type": "string", "format": "uri", "description": "URL externa se houver" },
+        "featured": { "type": "boolean", "description": "Exibir em destaque no carrossel de novidades" },
+        "active": { "type": "boolean", "description": "Status de publicação no site público" },
+        "order": { "type": "number", "description": "Ordem de prioridade de exibição" },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Data de cadastro" }
+      },
+      "required": ["id", "title", "type", "category", "mediaUrl", "description", "featured", "active", "order", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/leads/{leadId}": {
+      "schema": { "$ref": "#/entities/Lead" },
+      "description": "Coleção de pré-cadastros de revendedoras preenchidos no formulário público."
+    },
+    "/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/ConsignmentOrder" },
+      "description": "Coleção de mostruários consignados e acertos de 40 dias geridos no painel."
+    },
+    "/settings/business_config": {
+      "schema": { "$ref": "#/entities/BusinessSettings" },
+      "description": "Documento singleton com as regras de negócio e contatos da distribuidora."
+    },
+    "/admin_users/{userId}": {
+      "schema": { "$ref": "#/entities/AdminUser" },
+      "description": "Coleção de contas de login de administradores da distribuidora."
+    },
+    "/media_items/{mediaId}": {
+      "schema": { "$ref": "#/entities/MediaItem" },
+      "description": "Coleção de fotos, vídeos e novidades gerenciadas pelo painel da distribuidora."
+    }
+  }
+}
