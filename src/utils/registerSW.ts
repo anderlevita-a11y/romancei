@@ -1,23 +1,18 @@
 /**
- * Desregistra qualquer Service Worker e limpa caches para evitar
- * chunks desatualizados ou instâncias duplicadas do React no navegador.
+ * Registra o Service Worker oficial para suporte a Web Push Notifications nativas.
  */
-export function registerServiceWorker() {
+export async function registerServiceWorker(): Promise<ServiceWorkerRegistration | null> {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
-    return;
+    return null;
   }
 
-  navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (const registration of registrations) {
-      registration.unregister().catch(() => {});
-    }
-  }).catch(() => {});
-
-  if ('caches' in window) {
-    caches.keys().then((keys) => {
-      for (const key of keys) {
-        caches.delete(key).catch(() => {});
-      }
-    }).catch(() => {});
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js', {
+      scope: '/',
+    });
+    return registration;
+  } catch (err) {
+    console.warn('Notice registering Service Worker:', err);
+    return null;
   }
 }

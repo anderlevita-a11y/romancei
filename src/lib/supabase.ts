@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Lead, ConsignmentOrder, BusinessSettings, AdminUser, MediaItem, TestimonialItem, CommercialLine, ReferralCoupon, ResellerUser, ResellerSalesProfile } from '../types';
+import { Lead, ConsignmentOrder, BusinessSettings, AdminUser, MediaItem, TestimonialItem, CommercialLine, ReferralCoupon, ResellerUser, ResellerSalesProfile, ResellerDeviceSubscription } from '../types';
 
 export const DEFAULT_SUPABASE_URL = 'https://bminunltftkmfmsnjpea.supabase.co';
 export const DEFAULT_SUPABASE_ANON_KEY = 'sb_publishable_R0re_YsLe2GIIuB-bxJZVg_WyNWTyBZ';
@@ -974,7 +974,7 @@ export const mapCommercialLineFromSupabase = (row: any): CommercialLine => ({
   accentColor: row.accent_color || 'rose',
   isFavorita: Boolean(row.is_favorita),
   active: row.active !== false,
-  order: typeof row.order_index === 'number' ? row.order_index : 0,
+  order: typeof row.order_index === 'number' ? row.order_index : (typeof row.order === 'number' ? row.order : 0),
   createdAt: row.created_at || new Date().toISOString(),
 });
 
@@ -1009,17 +1009,17 @@ export const fetchCommercialLinesFromSupabase = async (
   if (!client) return null;
 
   try {
-    const { data, error } = await client
+    const result = await client
       .from('commercial_lines')
-      .select('*')
-      .order('order_index', { ascending: true });
+      .select('*');
 
-    if (error) {
-      console.warn('Erro ao buscar linhas comerciais do Supabase:', error.message);
+    if (result.error) {
+      console.warn('Erro ao buscar linhas comerciais do Supabase:', result.error.message);
       return null;
     }
 
-    return (data || []).map(mapCommercialLineFromSupabase);
+    const lines = (result.data || []).map(mapCommercialLineFromSupabase);
+    return lines.sort((a, b) => (a.order || 0) - (b.order || 0));
   } catch (e) {
     console.error('Erro em fetchCommercialLinesFromSupabase:', e);
     return null;
@@ -1211,6 +1211,8 @@ export const mapResellerUserFromSupabase = (row: any): ResellerUser => ({
   active: row.active !== false,
   createdAt: row.created_at || new Date().toISOString(),
   lastLogin: row.last_login || undefined,
+  deviceAuthorized: row.device_authorized !== false,
+  lastDeviceName: row.last_device_name || undefined,
 });
 
 export const mapResellerUserToSupabase = (user: ResellerUser) => ({
@@ -1225,6 +1227,8 @@ export const mapResellerUserToSupabase = (user: ResellerUser) => ({
   active: user.active !== false,
   created_at: user.createdAt || new Date().toISOString(),
   last_login: user.lastLogin || new Date().toISOString(),
+  device_authorized: user.deviceAuthorized ?? true,
+  last_device_name: user.lastDeviceName || null,
 });
 
 export const fetchResellerUsersFromSupabase = async (customUrl?: string, customKey?: string): Promise<ResellerUser[] | null> => {
@@ -1245,6 +1249,77 @@ export const saveResellerUserToSupabase = async (user: ResellerUser, customUrl?:
   try {
     const payload = mapResellerUserToSupabase(user);
     const { error } = await resilientUpsert(client, 'reseller_users', payload, 'id');
+    return !error;
+  } catch {
+    return false;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Mapeamento e Sincronização: Aparelhos e Web Push (reseller_devices)
+// ---------------------------------------------------------------------------
+export const mapResellerDeviceFromSupabase = (row: any): ResellerDeviceSubscription => ({
+  id: row.id,
+  resellerId: row.reseller_id || '',
+  resellerName: row.reseller_name || '',
+  resellerCpf: row.reseller_cpf || '',
+  resellerPhone: row.reseller_phone || '',
+  deviceName: row.device_name || 'Dispositivo Móvel',
+  deviceModel: row.device_model || 'Smartphone',
+  deviceType: (row.device_type as any) || 'mobile',
+  browser: row.browser || 'Navegador Web',
+  os: row.os || 'Android / iOS',
+  permissionStatus: (row.permission_status as any) || 'granted',
+  pushToken: row.push_token || '',
+  userAgent: row.user_agent || '',
+  registeredAt: row.registered_at || new Date().toISOString(),
+  lastActiveAt: row.last_active_at || new Date().toISOString(),
+  active: row.active !== false,
+  tokenStatus: 'active',
+  deactivatedByUser: false,
+  messagesSentCount: 1,
+  messagesDeliveredCount: 1,
+  messagesFailedCount: 0,
+  receivingStatus: 'active_receiving',
+});
+
+export const mapResellerDeviceToSupabase = (device: ResellerDeviceSubscription) => ({
+  id: device.id,
+  reseller_id: device.resellerId,
+  reseller_name: device.resellerName,
+  reseller_cpf: device.resellerCpf,
+  reseller_phone: device.resellerPhone || '',
+  device_name: device.deviceName,
+  device_model: device.deviceModel || '',
+  device_type: device.deviceType || 'mobile',
+  browser: device.browser || '',
+  os: device.os || '',
+  permission_status: device.permissionStatus || 'granted',
+  push_token: device.pushToken || '',
+  user_agent: device.userAgent || '',
+  registered_at: device.registeredAt || new Date().toISOString(),
+  last_active_at: device.lastActiveAt || new Date().toISOString(),
+  active: device.active !== false,
+});
+
+export const fetchResellerDevicesFromSupabase = async (customUrl?: string, customKey?: string): Promise<ResellerDeviceSubscription[] | null> => {
+  const client = getSupabaseClient(customUrl, customKey);
+  if (!client) return null;
+  try {
+    const { data, error } = await client.from('reseller_devices').select('*').order('registered_at', { ascending: false });
+    if (error) return null;
+    return (data || []).map(mapResellerDeviceFromSupabase);
+  } catch {
+    return null;
+  }
+};
+
+export const saveResellerDeviceToSupabase = async (device: ResellerDeviceSubscription, customUrl?: string, customKey?: string): Promise<boolean> => {
+  const client = getSupabaseClient(customUrl, customKey);
+  if (!client) return false;
+  try {
+    const payload = mapResellerDeviceToSupabase(device);
+    const { error } = await resilientUpsert(client, 'reseller_devices', payload, 'id');
     return !error;
   } catch {
     return false;
@@ -1366,7 +1441,8 @@ export const fetchAllCloudData = async (customUrl?: string, customKey?: string) 
     cloudTestimonials, 
     cloudLines,
     cloudResellers,
-    cloudSalesProfiles
+    cloudSalesProfiles,
+    cloudDevices
   ] = await Promise.all([
     fetchLeadsFromSupabase(customUrl, customKey),
     fetchOrdersFromSupabase(customUrl, customKey),
@@ -1378,6 +1454,7 @@ export const fetchAllCloudData = async (customUrl?: string, customKey?: string) 
     fetchCommercialLinesFromSupabase(customUrl, customKey),
     fetchResellerUsersFromSupabase(customUrl, customKey),
     fetchSalesProfilesFromSupabase(customUrl, customKey),
+    fetchResellerDevicesFromSupabase(customUrl, customKey),
   ]);
 
   return {
@@ -1391,6 +1468,7 @@ export const fetchAllCloudData = async (customUrl?: string, customKey?: string) 
     commercialLines: cloudLines,
     resellers: cloudResellers,
     salesProfiles: cloudSalesProfiles,
+    devices: cloudDevices,
   };
 };
 

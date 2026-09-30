@@ -63,7 +63,9 @@ export function SharePromoSection({
   };
 
   return (
-    <section id="indique-ganhe" className="py-8 sm:py-12 lg:py-16 relative overflow-hidden">
+    <section id="programa-indique-ganhe" className="py-8 sm:py-12 lg:py-16 relative overflow-hidden scroll-mt-24">
+      {/* Anchor for legacy links */}
+      <div id="indique-ganhe" className="absolute -top-24 left-0" />
       <div className="max-w-7xl mx-auto px-3.5 sm:px-6 lg:px-8">
         
         {/* Main Banner Card */}

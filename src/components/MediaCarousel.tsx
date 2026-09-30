@@ -124,7 +124,8 @@ export function MediaCarousel({ mediaItems, settings, onScrollToForm, onScrollTo
   ].filter(tab => tab.id === 'todos' || tab.count > 0);
 
   return (
-    <section id="galeria-fotos" className="py-16 sm:py-20 relative overflow-hidden bg-gradient-to-b from-stone-50 via-rose-50/25 to-white">
+    <section id="galeria-fotos" className="py-16 sm:py-20 relative overflow-hidden bg-gradient-to-b from-stone-50 via-rose-50/25 to-white scroll-mt-20">
+      <div id="fotos-colecoes" className="absolute -top-20" />
       
       {/* Decorative ambient background glows */}
       <div className="absolute top-1/3 left-0 w-96 h-96 bg-rose-200/25 rounded-full blur-3xl pointer-events-none -z-10" />

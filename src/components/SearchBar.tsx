@@ -256,14 +256,14 @@ export function SearchBar({
     },
     {
       id: 'lojas-fisicas-enderecos',
-      title: 'Lojas Físicas & Pontos de Retirada (Santa Catarina)',
-      subtitle: `Atendimento com vendedoras parceiras em SC. Veja endereços, contatos e catálogo.`,
+      title: 'Rede de Lojas Físicas & Vendedora Favorita (Santa Catarina)',
+      subtitle: `Atendimento em Itapema, Joinville (Hevilin) e Florianópolis (Warla). Veja pontos, contatos e WhatsApp direto.`,
       category: 'Lojas & Contato',
-      keywords: ['loja fisica', 'endereco', 'onde fica', 'vendedora', 'joinville', 'hevilin', 'florianopolis', 'warla', 'localizacao', 'mapa', 'retirada', 'ponto de apoio'],
+      keywords: ['loja fisica', 'rede de lojas', 'vendedora favorita', 'endereco', 'onde fica', 'vendedora', 'joinville', 'hevilin', 'florianopolis', 'warla', 'itapema', 'localizacao', 'mapa', 'retirada', 'ponto de apoio'],
       icon: Store,
-      targetId: 'faq',
+      targetId: 'rede-lojas-fisicas',
       badge: 'Lojas SC',
-      badgeColor: 'bg-stone-800 text-white'
+      badgeColor: 'bg-rose-700 text-white'
     },
     {
       id: 'app-download-romance',

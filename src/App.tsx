@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { defaultSettings, initialLeads, initialOrders, defaultAdminUsers, initialMediaItems, initialTestimonials, productCategories, initialResellers, initialSalesProfiles } from './data/initialData';
-import { Lead, ConsignmentOrder, BusinessSettings, LeadStatus, AdminUser, MediaItem, TestimonialItem, TestimonialStatus, CommercialLine, RealtimeLeadNotification, ReferralCoupon, ResellerUser, ResellerSalesProfile } from './types';
+import { Lead, ConsignmentOrder, BusinessSettings, LeadStatus, AdminUser, MediaItem, TestimonialItem, TestimonialStatus, CommercialLine, RealtimeLeadNotification, ReferralCoupon, ResellerUser, ResellerSalesProfile, ResellerDeviceSubscription } from './types';
 import { playNotificationChime } from './components/admin/AdminLeadToast';
 import {
   syncLeadToSupabase,
@@ -37,24 +37,18 @@ import {
   subscribeToSupabaseRealtime,
   fetchAllCloudData
 } from './lib/supabase';
+import { saveResellerToFirestore, fetchDevicesFromFirestore } from './lib/firebase';
+import { getStoredDeviceSubscriptions } from './utils/webPushHelper';
 
 // Public Components
 import { Header } from './components/Header';
 import { Hero } from './components/Hero';
 import { MediaCarousel } from './components/MediaCarousel';
 import { VideoShowcase } from './components/VideoShowcase';
-import { BusinessRuleHighlights } from './components/BusinessRuleHighlights';
-import { HowItWorks } from './components/HowItWorks';
-import { ProfitCalculator } from './components/ProfitCalculator';
-import { CatalogExplanation } from './components/CatalogExplanation';
-import { ProductShowcase } from './components/ProductShowcase';
-import { RomanceEstrelas } from './components/RomanceEstrelas';
-import { Testimonials } from './components/Testimonials';
-import { InstagramPromoSection } from './components/InstagramPromoSection';
-import { SharePromoSection } from './components/SharePromoSection';
+import { QuickSectionsNav } from './components/QuickSectionsNav';
+import { PackagedSectionModal } from './components/PackagedSectionModal';
 import { LeadForm } from './components/LeadForm';
 import { ReferralModal } from './components/ReferralModal';
-import { FaqSection } from './components/FaqSection';
 import { Footer } from './components/Footer';
 import { LgpdModal, LegalTab } from './components/LgpdModal';
 import { CookieConsentBanner } from './components/CookieConsentBanner';
@@ -305,6 +299,7 @@ export default function App() {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isReferralModalOpen, setIsReferralModalOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
+  const [activePackagedSection, setActivePackagedSection] = useState<string | null>(null);
   const [legalModalTab, setLegalModalTab] = useState<LegalTab>('privacy');
   const [preselectedFavorita, setPreselectedFavorita] = useState<'sim' | 'nao'>('sim');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -411,7 +406,33 @@ export default function App() {
     setIsLgpdModalOpen(true);
   };
 
+  const PACKAGED_SECTION_MAP: Record<string, string> = {
+    'segredo-maximo-lucro': 'segredo-lucro',
+    'simulador-lucro': 'segredo-lucro',
+    'regras-de-negocio': 'segredo-lucro',
+    'romance-estrelas-parcelamento': 'romance-estrelas',
+    'romance-estrelas': 'romance-estrelas',
+    'estrelas-romance': 'romance-estrelas',
+    'rede-lojas-fisicas': 'lojas-fisicas',
+    'linhas-comerciais': 'linhas-comerciais',
+    'produtos': 'linhas-comerciais',
+    'depoimentos-avaliacoes': 'depoimentos-avaliacoes',
+    'depoimentos': 'depoimentos-avaliacoes',
+    'bonus-boas-vindas-instagram': 'bonus-instagram',
+    'promocao-instagram': 'bonus-instagram',
+    'programa-indique-ganhe': 'indique-ganhe',
+    'indique-ganhe': 'indique-ganhe',
+    'guia-revendedora': 'guia-revendedora',
+    'como-funciona': 'guia-revendedora',
+  };
+
   const handleScrollToSection = (elementId: string) => {
+    const packagedKey = PACKAGED_SECTION_MAP[elementId];
+    if (packagedKey) {
+      setActivePackagedSection(packagedKey);
+      return;
+    }
+
     const el = document.getElementById(elementId);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
@@ -703,6 +724,27 @@ export default function App() {
             return merged;
           });
         }
+        if (Array.isArray(cloudData.devices) && cloudData.devices.length > 0) {
+          const stored = getStoredDeviceSubscriptions();
+          const devMap = new Map<string, ResellerDeviceSubscription>();
+          stored.forEach((d) => devMap.set(d.id, d));
+          cloudData.devices.forEach((d) => devMap.set(d.id, { ...devMap.get(d.id), ...d }));
+          const mergedDevs = Array.from(devMap.values());
+          localStorage.setItem('romance_itapema_reseller_devices', JSON.stringify(mergedDevs));
+        }
+
+        // Busca complementar de dispositivos no Firestore
+        fetchDevicesFromFirestore().then((fDevs) => {
+          if (Array.isArray(fDevs) && fDevs.length > 0) {
+            const stored = getStoredDeviceSubscriptions();
+            const devMap = new Map<string, ResellerDeviceSubscription>();
+            stored.forEach((d) => devMap.set(d.id, d));
+            fDevs.forEach((d) => devMap.set(d.id, { ...devMap.get(d.id), ...d }));
+            const mergedDevs = Array.from(devMap.values());
+            localStorage.setItem('romance_itapema_reseller_devices', JSON.stringify(mergedDevs));
+          }
+        }).catch(() => {});
+
         if (cloudData.settings && Object.keys(cloudData.settings).length > 0) {
           setSettings((prev) => ({
             ...prev,
@@ -1437,17 +1479,31 @@ export default function App() {
   };
 
   const scrollToVideos = () => {
-    const el = document.getElementById('sessao-videos') || document.getElementById('videos-oficiais');
+    setActivePackagedSection(null);
+    const el = document.getElementById('sessao-videos') || document.getElementById('videos-romance-play') || document.getElementById('romance-play');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     }
   };
 
   const scrollToPhotos = () => {
-    const el = document.getElementById('galeria-fotos') || document.getElementById('galeria-novidades');
+    setActivePackagedSection(null);
+    const el = document.getElementById('galeria-fotos') || document.getElementById('fotos-colecoes');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     }
+  };
+
+  const handleOpenPackagedSection = (secId: string) => {
+    if (secId === 'fotos-colecoes' || secId === 'galeria-fotos') {
+      scrollToPhotos();
+      return;
+    }
+    if (secId === 'videos-romance-play' || secId === 'sessao-videos' || secId === 'romance-play') {
+      scrollToVideos();
+      return;
+    }
+    setActivePackagedSection(secId);
   };
 
   const handleSelectPlanAndScroll = (wantsFavorita: 'sim' | 'nao') => {
@@ -1534,6 +1590,25 @@ export default function App() {
     saveSalesProfileToSupabase(profile, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
   };
 
+  const handleUpdateReseller = (updatedReseller: ResellerUser) => {
+    setResellers((prev) => {
+      const idx = prev.findIndex(
+        (r) => r.id === updatedReseller.id || (updatedReseller.cpf && r.cpf.replace(/\D/g, '') === updatedReseller.cpf.replace(/\D/g, ''))
+      );
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], ...updatedReseller };
+        return next;
+      }
+      return [updatedReseller, ...prev];
+    });
+    if (currentReseller && (currentReseller.id === updatedReseller.id || currentReseller.cpf === updatedReseller.cpf)) {
+      setCurrentReseller(updatedReseller);
+    }
+    saveResellerUserToSupabase(updatedReseller, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
+    saveResellerToFirestore(updatedReseller).catch(() => {});
+  };
+
   const handleResellerLogout = () => {
     setCurrentReseller(null);
     setIsResellerDashboardView(false);
@@ -1586,6 +1661,7 @@ export default function App() {
         onDeleteAdminUser={handleDeleteAdminUser}
         onResetToDemoData={handleResetToDemoData}
         onSaveProfile={handleSaveSalesProfile}
+        onUpdateReseller={handleUpdateReseller}
         notifications={notifications}
         soundEnabled={notificationSoundEnabled}
         onToggleSound={handleToggleSound}
@@ -1612,6 +1688,7 @@ export default function App() {
         salesProfile={myProfile}
         settings={settings}
         onSaveProfile={handleSaveSalesProfile}
+        onUpdateReseller={handleUpdateReseller}
         onLogout={handleResellerLogout}
         onBackToSite={() => setIsResellerDashboardView(false)}
       />
@@ -1637,6 +1714,7 @@ export default function App() {
         onOpenReferralModal={() => setIsReferralModalOpen(true)}
         onOpenShare={() => setIsShareModalOpen(true)}
         onOpenResellerPortal={handleOpenResellerPortal}
+        onOpenPackagedSection={handleOpenPackagedSection}
         currentReseller={currentReseller}
       />
 
@@ -1645,13 +1723,13 @@ export default function App() {
         <Hero
           settings={settings}
           onScrollToForm={scrollToForm}
-          onScrollToHowItWorks={scrollToHowItWorks}
+          onScrollToHowItWorks={() => handleOpenPackagedSection('guia-revendedora')}
           onScrollToVideos={scrollToVideos}
           onOpenSearch={() => setIsSearchOpen(true)}
           onOpenReferralModal={() => setIsReferralModalOpen(true)}
         />
 
-        {/* Exclusive Photo & Collection Carousel: Novidades 2026, Lingeries & Catálogo */}
+        {/* Coleções 2026 & Fotos Oficiais no Frontend */}
         <MediaCarousel
           mediaItems={mediaItems}
           settings={settings}
@@ -1659,68 +1737,23 @@ export default function App() {
           onScrollToVideos={scrollToVideos}
         />
 
-        {/* Exclusive Official Video Exhibition Suite: Romance Play */}
-        <VideoShowcase 
+        {/* Romance Play: Vídeos Oficiais & Dicas no Frontend */}
+        <VideoShowcase
           settings={settings}
           customVideos={mediaItems.filter((m) => m.type === 'video')}
           onScrollToForm={scrollToForm}
         />
 
-        {/* 4 Pillars Rule Highlights */}
-        <BusinessRuleHighlights onScrollToForm={scrollToForm} />
+        {/* Portal de Acesso Rápido em Ícones: As Seções Empacotadas */}
+        <QuickSectionsNav onOpenSection={handleOpenPackagedSection} />
 
-        {/* How It Works (Step by Step) */}
-        <HowItWorks onScrollToForm={scrollToForm} />
-
-        {/* Interactive Profit Simulator */}
-        <ProfitCalculator onSelectPlanAndScroll={handleSelectPlanAndScroll} />
-
-        {/* Deep explanation of Catálogo Favorita (40% commission with R$ 400 - R$ 600 first order) */}
-        <CatalogExplanation settings={settings} onScrollToForm={scrollToForm} />
-
-        {/* Visual Lingerie Showcase */}
-        <ProductShowcase 
-          settings={settings} 
-          onScrollToForm={scrollToForm} 
-          commercialLines={commercialLines}
-        />
-
-        {/* Promoção Estrelas Romance 2026: Concorra a Carro, Motos e Mais de R$ 450 Mil em Prêmios */}
-        <RomanceEstrelas settings={settings} onScrollToForm={scrollToForm} />
-
-        {/* Testimonials from Itajaí & SC */}
-        <Testimonials 
-          settings={settings} 
-          testimonialsList={testimonials} 
-          onSubmitTestimonial={handleSubmitPublicTestimonial}
-        />
-
-        {/* Instagram Promotion & Gift Campaign */}
-        <InstagramPromoSection
-          settings={settings}
-          onScrollToForm={scrollToForm}
-          onOpenModal={() => setIsInstagramModalOpen(true)}
-        />
-
-        {/* Indique & Ganhe (R$ 10,00 por Kit Entregue) */}
-        <SharePromoSection
-          settings={settings}
-          onOpenReferralModal={() => setIsReferralModalOpen(true)}
-        />
-
-        {/* Pre-Registration Lead Form (LGPD Compliant) */}
+        {/* Pre-Registration Lead Form (LGPD Compliant) - Exclusivo abaixo do portal */}
         <LeadForm
           settings={settings}
           onAddLead={handleAddLead}
           onOpenLgpdModal={(tab) => handleOpenLegalModal(tab || 'privacy')}
           onOpenReferralModal={() => setIsReferralModalOpen(true)}
           preselectedFavorita={preselectedFavorita}
-        />
-
-        {/* FAQs */}
-        <FaqSection 
-          settings={settings}
-          onScrollToForm={scrollToForm}
         />
       </main>
 
@@ -1743,6 +1776,24 @@ export default function App() {
         onScrollToForm={scrollToForm}
         onOpenSearch={() => setIsSearchOpen(true)}
         onOpenReferralModal={() => setIsReferralModalOpen(true)}
+        onOpenPackagedSection={handleOpenPackagedSection}
+      />
+
+      {/* Modal / Container das Seções Empacotadas nos Ícones (Aparecem somente ao clique) */}
+      <PackagedSectionModal
+        activeSection={activePackagedSection}
+        onClose={() => setActivePackagedSection(null)}
+        onSelectSection={(secId) => setActivePackagedSection(secId)}
+        settings={settings}
+        onScrollToForm={scrollToForm}
+        onSelectPlanAndScroll={handleSelectPlanAndScroll}
+        commercialLines={commercialLines}
+        testimonials={testimonials}
+        onSubmitTestimonial={handleSubmitPublicTestimonial}
+        onOpenInstagramModal={() => setIsInstagramModalOpen(true)}
+        onOpenReferralModal={() => setIsReferralModalOpen(true)}
+        onOpenShareModal={() => setIsShareModalOpen(true)}
+        mediaItems={mediaItems}
       />
 
       {/* Compartilhe & Ganhe Modal (Opcional) */}

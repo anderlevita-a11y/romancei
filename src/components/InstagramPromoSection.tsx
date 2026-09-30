@@ -36,7 +36,9 @@ export function InstagramPromoSection({
   };
 
   return (
-    <section id="promocao-instagram" className="py-12 relative overflow-hidden">
+    <section id="bonus-boas-vindas-instagram" className="py-12 relative overflow-hidden scroll-mt-24">
+      {/* Anchor for legacy links */}
+      <div id="promocao-instagram" className="absolute -top-24 left-0" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Main Banner Card */}
@@ -53,12 +55,12 @@ export function InstagramPromoSection({
               
               <div className="inline-flex items-center gap-2 bg-gradient-to-r from-amber-500/30 via-rose-500/30 to-purple-500/30 backdrop-blur-md px-3.5 py-1.5 rounded-full border border-white/20 text-xs font-bold text-rose-200">
                 <Gift className="w-4 h-4 text-amber-300 animate-pulse" />
-                <span>Bônus Exclusivo de Boas-Vindas</span>
+                <span>Bônus Exclusivo de Boas-Vindas Instagram</span>
               </div>
 
               <div className="space-y-3">
                 <h2 className="font-serif-luxury text-2xl sm:text-3xl lg:text-4xl font-bold text-white leading-tight">
-                  Cadastre-se e siga <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-300 to-purple-200 font-extrabold">@{handleClean}</span> no Instagram para ganhar um brinde especial!
+                  Bônus Exclusivo de Boas-Vindas: Cadastre-se e siga <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-300 to-purple-200 font-extrabold">@{handleClean}</span> no Instagram para ganhar um brinde especial!
                 </h2>
                 <p className="text-sm sm:text-base text-rose-100/90 max-w-2xl leading-relaxed">
                   Queremos comemorar sua entrada na equipe Romance Itapema! Complete seu pré-cadastro gratuito de lingerie sem investimento e siga nossa página oficial no Instagram para retirar um mimo exclusivo na entrega do seu mostruário.

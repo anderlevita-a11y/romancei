@@ -25,5 +25,25 @@ service cloud.firestore {
     match /media_items/{mediaId} {
       allow read, write: if true;
     }
+
+    // Dispositivos e inscrições de Web Push das revendedoras
+    match /reseller_devices/{deviceId} {
+      allow read, write: if true;
+    }
+
+    // Contas de revendedoras cadastradas
+    match /resellers/{resellerId} {
+      allow read, write: if true;
+    }
+
+    // Perfis de atendimento e datas de retorno
+    match /sales_profiles/{profileId} {
+      allow read, write: if true;
+    }
+
+    // Logs e histórico de disparos de Web Push
+    match /web_push_logs/{logId} {
+      allow read, write: if true;
+    }
   }
 }

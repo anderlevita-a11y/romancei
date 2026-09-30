@@ -103,6 +103,7 @@ interface AdminDashboardProps {
   onSaveAdminUser?: (user: AdminUser) => void;
   onDeleteAdminUser?: (userId: string) => void;
   onSaveProfile?: (profile: ResellerSalesProfile) => void;
+  onUpdateReseller?: (reseller: ResellerUser) => void;
   onResetToDemoData: () => void;
   onBackToPublicSite: () => void;
   onLogout: () => void;
@@ -157,6 +158,7 @@ export function AdminDashboard({
   onSaveAdminUser,
   onDeleteAdminUser,
   onSaveProfile,
+  onUpdateReseller,
   onResetToDemoData,
   onBackToPublicSite,
   onLogout,
@@ -537,6 +539,7 @@ export function AdminDashboard({
             salesProfiles={salesProfiles}
             settings={settings}
             onSaveProfile={onSaveProfile}
+            onUpdateReseller={onUpdateReseller}
           />
         )}
 

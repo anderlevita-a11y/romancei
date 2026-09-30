@@ -41,19 +41,21 @@ export function HowItWorks({ onScrollToForm }: HowItWorksProps) {
   ];
 
   return (
-    <section id="como-funciona" className="py-20 relative">
+    <section id="guia-revendedora" className="py-20 relative scroll-mt-24">
+      {/* Anchor for legacy links */}
+      <div id="como-funciona" className="absolute -top-24 left-0" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3 mb-16">
           <span className="text-xs uppercase font-extrabold tracking-widest text-rose-800 bg-white/70 backdrop-blur-md px-3.5 py-1 rounded-full border border-white/80 shadow-xs">
-            Passo a Passo Simples
+            Guia Oficial da Revendedora • Passo a Passo
           </span>
           <h2 className="font-serif-luxury text-3xl sm:text-4xl lg:text-5xl font-bold text-stone-900">
-            Do cadastro ao lucro: veja como é fácil começar
+            Guia Completo da Revendedora Romance Itapema
           </h2>
           <p className="text-stone-600 text-base sm:text-lg">
-            Um processo transparente feito para você ter independência financeira e trabalhar no seu próprio horário.
+            Do pré-cadastro gratuito ao recebimento do kit e acerto de contas a cada 40 dias: um processo 100% transparente para sua independência financeira.
           </p>
         </div>
 

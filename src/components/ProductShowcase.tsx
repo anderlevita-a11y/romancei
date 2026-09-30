@@ -35,7 +35,9 @@ export function ProductShowcase({ settings, commercialLines, onScrollToForm }: P
     });
 
   return (
-    <section id="produtos" className="py-20 relative overflow-hidden bg-gradient-to-b from-stone-50/50 via-white to-stone-50/70">
+    <section id="linhas-comerciais" className="py-20 relative overflow-hidden bg-gradient-to-b from-stone-50/50 via-white to-stone-50/70 scroll-mt-24">
+      {/* Anchor for legacy links */}
+      <div id="produtos" className="absolute -top-24 left-0" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}

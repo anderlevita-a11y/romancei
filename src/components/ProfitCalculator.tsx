@@ -36,20 +36,22 @@ export function ProfitCalculator({ onSelectPlanAndScroll }: ProfitCalculatorProp
   ];
 
   return (
-    <section id="simulador-lucro" className="py-20 relative">
+    <section id="segredo-maximo-lucro" className="py-20 relative scroll-mt-24">
+      {/* Anchor for legacy simulador-lucro links */}
+      <div id="simulador-lucro" className="absolute -top-24 left-0" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
         <div className="text-center max-w-3xl mx-auto space-y-3 mb-12">
-          <div className="inline-flex items-center gap-1.5 bg-white/80 backdrop-blur-md text-amber-900 text-xs font-bold px-4 py-1.5 rounded-full border border-amber-200/80 shadow-xs">
-            <Calculator className="w-3.5 h-3.5 text-amber-600" />
-            <span>Simulador de Lucro em Tempo Real</span>
+          <div className="inline-flex items-center gap-1.5 bg-gradient-to-r from-amber-100 to-emerald-100 text-amber-950 text-xs font-black uppercase tracking-wider px-4 py-1.5 rounded-full border border-amber-300 shadow-xs">
+            <TrendingUp className="w-3.5 h-3.5 text-amber-700" />
+            <span>O Segredo Máximo do Lucro • 30% a 40% Líquido</span>
           </div>
           <h2 className="font-serif-luxury text-3xl sm:text-4xl lg:text-5xl font-bold text-stone-900">
-            Quanto você vai lucrar a cada 40 dias?
+            O Segredo Máximo do Lucro: Quanto você vai lucrar a cada 40 dias?
           </h2>
           <p className="text-stone-600 text-base sm:text-lg">
-            Mova o valor de vendas e acompanhe as barras de progresso comparando o retorno a <strong className="text-stone-900 font-bold">30%</strong> e a <strong className="text-amber-800 font-bold">40% com Favorita</strong>.
+            Mova o valor de vendas e acompanhe as barras de progresso comparando o retorno a <strong className="text-stone-900 font-bold">30%</strong> e a <strong className="text-amber-800 font-bold">40% com Favorita</strong>. Sem investimento inicial e você só paga o que vender!
           </p>
         </div>
 

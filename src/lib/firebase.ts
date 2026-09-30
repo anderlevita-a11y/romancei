@@ -13,7 +13,7 @@ import {
   getDocs,
   getDocFromServer
 } from 'firebase/firestore';
-import { Lead, ConsignmentOrder, BusinessSettings, LeadStatus, AdminUser, MediaItem } from '../types';
+import { Lead, ConsignmentOrder, BusinessSettings, LeadStatus, AdminUser, MediaItem, ResellerDeviceSubscription, ResellerUser } from '../types';
 import firebaseConfigJson from '../../firebase-applet-config.json';
 
 const firebaseConfig = {
@@ -457,4 +457,58 @@ export async function deleteMediaItemFromFirestore(itemId: string): Promise<void
     throw e;
   }
 }
+
+export const DEVICES_COLLECTION = 'reseller_devices';
+export const RESELLERS_COLLECTION = 'resellers';
+export const SALES_PROFILES_COLLECTION = 'sales_profiles';
+
+export async function saveDeviceToFirestore(device: ResellerDeviceSubscription): Promise<void> {
+  try {
+    const docRef = doc(db, DEVICES_COLLECTION, device.id);
+    const sanitized = sanitizeForFirestore(device);
+    await setDoc(docRef, sanitized, { merge: true });
+  } catch (e) {
+    console.warn('Notice saving device to Firestore:', e);
+  }
+}
+
+export async function fetchDevicesFromFirestore(): Promise<ResellerDeviceSubscription[]> {
+  try {
+    const colRef = collection(db, DEVICES_COLLECTION);
+    const snap = await getDocs(colRef);
+    const list: ResellerDeviceSubscription[] = [];
+    snap.forEach((d) => {
+      list.push(d.data() as ResellerDeviceSubscription);
+    });
+    return list;
+  } catch (e) {
+    return [];
+  }
+}
+
+export async function saveResellerToFirestore(reseller: ResellerUser): Promise<void> {
+  try {
+    const docRef = doc(db, RESELLERS_COLLECTION, reseller.id);
+    const sanitized = sanitizeForFirestore(reseller);
+    await setDoc(docRef, sanitized, { merge: true });
+  } catch (e) {
+    console.warn('Notice saving reseller to Firestore:', e);
+  }
+}
+
+export async function fetchResellersFromFirestore(): Promise<ResellerUser[]> {
+  try {
+    const colRef = collection(db, RESELLERS_COLLECTION);
+    const snap = await getDocs(colRef);
+    const list: ResellerUser[] = [];
+    snap.forEach((d) => {
+      list.push(d.data() as ResellerUser);
+    });
+    return list;
+  } catch (e) {
+    return [];
+  }
+}
+
+
 

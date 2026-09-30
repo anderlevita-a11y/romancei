@@ -53,7 +53,9 @@ export function Testimonials({
   ];
 
   return (
-    <section id="depoimentos" className="py-20 relative">
+    <section id="depoimentos-avaliacoes" className="py-20 relative scroll-mt-24">
+      {/* Anchor for legacy links */}
+      <div id="depoimentos" className="absolute -top-24 left-0" />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
@@ -77,11 +79,11 @@ export function Testimonials({
                 d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
               />
             </svg>
-            <span className="font-semibold">Depoimentos Reais & Avaliações Verificadas</span>
+            <span className="font-semibold">Depoimentos e Avaliações Verificadas</span>
           </div>
 
           <h2 className="font-serif-luxury text-3xl sm:text-4xl lg:text-5xl font-bold text-stone-900 leading-tight">
-            Histórias Reais de Mulheres que Conquistaram sua Renda Extra
+            Depoimentos e Avaliações Verificadas: Histórias Reais de Sucesso
           </h2>
           <p className="text-stone-600 text-base sm:text-lg">
             Relatos autênticos de quem já revende com zero investimento e acertos a cada 40 dias na Distribuição Oficial Romance.

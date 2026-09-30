@@ -642,8 +642,10 @@ export function VideoShowcase({ settings, customVideos = [], onScrollToForm }: V
   return (
     <section 
       id="sessao-videos" 
-      className="py-16 sm:py-24 bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 text-white relative overflow-hidden"
+      className="py-16 sm:py-24 bg-gradient-to-b from-stone-950 via-stone-900 to-stone-950 text-white relative overflow-hidden scroll-mt-20"
     >
+      <div id="videos-romance-play" className="absolute -top-20" />
+      <div id="romance-play" className="absolute -top-20" />
       {/* Decorative subtle ambient lights */}
       <div className="absolute top-0 left-1/4 w-96 h-96 bg-rose-600/10 rounded-full blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-pink-600/10 rounded-full blur-3xl pointer-events-none" />

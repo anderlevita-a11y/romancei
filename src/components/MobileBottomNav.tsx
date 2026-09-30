@@ -17,6 +17,7 @@ interface MobileBottomNavProps {
   onOpenSearch: () => void;
   onOpenReferralModal?: () => void;
   onOpenShare?: () => void;
+  onOpenPackagedSection?: (sectionId: string) => void;
 }
 
 export function MobileBottomNav({
@@ -25,6 +26,7 @@ export function MobileBottomNav({
   onOpenSearch,
   onOpenReferralModal,
   onOpenShare,
+  onOpenPackagedSection,
 }: MobileBottomNavProps) {
   const whatsappUrl = buildWhatsAppLink(
     settings.officialWhatsApp || '5547997626121',
@@ -32,6 +34,24 @@ export function MobileBottomNav({
   );
 
   const scrollToSection = (id: string) => {
+    if (onOpenPackagedSection) {
+      if (id === 'simulador-lucro' || id === 'segredo-lucro') {
+        onOpenPackagedSection('romance-estrelas');
+        return;
+      }
+      if (id === 'galeria-fotos' || id === 'fotos' || id === 'novidades') {
+        onOpenPackagedSection('fotos-colecoes');
+        return;
+      }
+      if (id === 'sessao-videos' || id === 'videos-oficiais' || id === 'videos') {
+        onOpenPackagedSection('videos-romance-play');
+        return;
+      }
+      if (id === 'como-funciona') {
+        onOpenPackagedSection('guia-revendedora');
+        return;
+      }
+    }
     const el = document.getElementById(id);
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });

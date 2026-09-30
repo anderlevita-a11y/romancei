@@ -1,4 +1,6 @@
 import { ResellerDeviceSubscription, WebPushLog, PushSanitizationLog, ResellerSalesProfile, ResellerUser } from '../types';
+import { saveResellerDeviceToSupabase, fetchResellerDevicesFromSupabase, saveResellerUserToSupabase } from '../lib/supabase';
+import { saveDeviceToFirestore, fetchDevicesFromFirestore, saveResellerToFirestore } from '../lib/firebase';
 
 const STORAGE_DEVICES_KEY = 'romance_itapema_reseller_devices';
 const STORAGE_LOGS_KEY = 'romance_itapema_web_push_logs';
@@ -128,6 +130,7 @@ export async function requestPushPermission(): Promise<'granted' | 'denied' | 'd
 
 /**
  * Dispara uma notificação nativa na barra/área de notificações do dispositivo
+ * Suporta ServiceWorkerRegistration.showNotification (obrigatório em dispositivos móveis Android) e Notification construtor
  */
 export function showNativePushNotification(
   title: string,
@@ -148,24 +151,22 @@ export function showNativePushNotification(
     return false;
   }
 
-  try {
-    const notification = new Notification(title, {
-      body: options?.body || 'Romance Itapema: Aviso do seu mostruário consignado.',
-      icon: options?.icon || 'https://images.unsplash.com/photo-1596704017254-9b121068fb31?w=192&auto=format&fit=crop&q=80',
-      badge: options?.badge || 'https://images.unsplash.com/photo-1596704017254-9b121068fb31?w=96&auto=format&fit=crop&q=80',
-      tag: options?.tag || 'romance-push',
-      ...({ vibrate: [200, 100, 200] } as any),
-    });
+  const iconUrl = options?.icon || '/favicon.ico';
+  const badgeUrl = options?.badge || '/favicon.ico';
 
-    notification.onclick = () => {
-      window.focus();
-      if (options?.url) {
-        window.location.href = options.url;
-      }
-      notification.close();
-    };
+  const notifOptions: NotificationOptions = {
+    body: options?.body || 'Romance Itapema: Aviso do seu mostruário consignado.',
+    icon: iconUrl,
+    badge: badgeUrl,
+    tag: options?.tag || `romance-push-${Date.now()}`,
+    data: {
+      url: options?.url || '/',
+      ...options?.data,
+    },
+    ...({ vibrate: [200, 100, 200] } as any),
+  };
 
-    // Tocar feedback sonoro suave se possível
+  const playFeedbackSound = () => {
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const osc = audioCtx.createOscillator();
@@ -182,11 +183,43 @@ export function showNativePushNotification(
     } catch {
       // áudio opcional
     }
+  };
 
+  // 1. Tenta via Service Worker Registration (padrão oficial moderno e obrigatório no Chrome Mobile Android)
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.ready
+      .then((reg) => {
+        return reg.showNotification(title, notifOptions);
+      })
+      .then(() => {
+        playFeedbackSound();
+      })
+      .catch((err) => {
+        console.warn('Fallback para construtor Notification nativo:', err);
+        tryDirectNotification();
+      });
     return true;
-  } catch (err) {
-    console.warn('Falha ao instanciar Notification nativa (tentando modo alternativo):', err);
-    return false;
+  }
+
+  // 2. Fallback para construtor direto no Desktop
+  return tryDirectNotification();
+
+  function tryDirectNotification(): boolean {
+    try {
+      const notification = new Notification(title, notifOptions);
+      notification.onclick = () => {
+        window.focus();
+        if (options?.url) {
+          window.location.href = options.url;
+        }
+        notification.close();
+      };
+      playFeedbackSound();
+      return true;
+    } catch (err) {
+      console.warn('Falha ao instanciar Notification nativa:', err);
+      return false;
+    }
   }
 }
 
@@ -267,6 +300,54 @@ export const DEFAULT_DEVICES: ResellerDeviceSubscription[] = [
     lastMessageSentAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
   },
   {
+    id: 'dev-reseller-4-galaxy-a54',
+    resellerId: 'reseller-4',
+    resellerName: 'Luciana Ferreira Lima',
+    resellerCpf: '321.654.987-12',
+    resellerPhone: '(47) 99345-6789',
+    deviceName: 'Samsung Galaxy A54 (Chrome Mobile)',
+    deviceModel: 'Samsung Galaxy A54',
+    deviceType: 'mobile',
+    browser: 'Chrome Mobile',
+    os: 'Android 14',
+    permissionStatus: 'granted',
+    pushToken: 'push-token-reseller-4-luciana',
+    registeredAt: '2026-03-05T14:20:00.000Z',
+    lastActiveAt: new Date().toISOString(),
+    active: true,
+    tokenStatus: 'active',
+    deactivatedByUser: false,
+    messagesSentCount: 1,
+    messagesDeliveredCount: 1,
+    messagesFailedCount: 0,
+    receivingStatus: 'tolerance_phase',
+    lastMessageSentAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
+    id: 'dev-reseller-5-iphone-13',
+    resellerId: 'reseller-5',
+    resellerName: 'Patricia Alcantara Souza',
+    resellerCpf: '654.321.987-89',
+    resellerPhone: '(47) 99567-8901',
+    deviceName: 'Apple iPhone 13 (Safari Mobile)',
+    deviceModel: 'Apple iPhone 13',
+    deviceType: 'mobile',
+    browser: 'Safari',
+    os: 'iOS 17.5',
+    permissionStatus: 'granted',
+    pushToken: 'push-token-reseller-5-patricia',
+    registeredAt: '2026-03-06T16:00:00.000Z',
+    lastActiveAt: new Date().toISOString(),
+    active: true,
+    tokenStatus: 'active',
+    deactivatedByUser: false,
+    messagesSentCount: 1,
+    messagesDeliveredCount: 1,
+    messagesFailedCount: 0,
+    receivingStatus: 'tolerance_phase',
+    lastMessageSentAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString(),
+  },
+  {
     id: 'dev-demo-antigo-expurgo',
     resellerId: 'reseller-demo-antigo',
     resellerName: 'Aparelho Antigo Descartado (Demonstração)',
@@ -309,24 +390,99 @@ export function getStoredDeviceSubscriptions(): ResellerDeviceSubscription[] {
       localStorage.setItem(STORAGE_DEVICES_KEY, JSON.stringify(DEFAULT_DEVICES));
       return DEFAULT_DEVICES;
     }
-    return parsed;
+    // Garante que os aparelhos padrão também estejam presentes se não tiverem sido expurgados
+    const map = new Map<string, ResellerDeviceSubscription>();
+    parsed.forEach((d: ResellerDeviceSubscription) => {
+      if (d && d.id) map.set(d.id, d);
+    });
+    DEFAULT_DEVICES.forEach((d) => {
+      if (!map.has(d.id)) {
+        map.set(d.id, d);
+      }
+    });
+    return Array.from(map.values());
   } catch {
     return DEFAULT_DEVICES;
   }
 }
 
 /**
- * Salva ou atualiza a inscrição do dispositivo da vendedora
+ * Busca de forma unificada os aparelhos da nuvem (Firestore + Supabase) e sincroniza com o localStorage.
+ */
+export async function fetchAndSyncAllDevices(supabaseUrl?: string, supabaseKey?: string): Promise<ResellerDeviceSubscription[]> {
+  const localDevs = getStoredDeviceSubscriptions();
+  const map = new Map<string, ResellerDeviceSubscription>();
+  localDevs.forEach((d) => {
+    if (d && d.id) map.set(d.id, d);
+  });
+
+  try {
+    const [firestoreDevs, supabaseDevs] = await Promise.all([
+      fetchDevicesFromFirestore().catch(() => []),
+      fetchResellerDevicesFromSupabase(supabaseUrl, supabaseKey).catch(() => null),
+    ]);
+
+    if (Array.isArray(firestoreDevs)) {
+      firestoreDevs.forEach((d) => {
+        if (d && d.id) {
+          const prev = map.get(d.id);
+          map.set(d.id, { ...prev, ...d });
+        }
+      });
+    }
+
+    if (Array.isArray(supabaseDevs)) {
+      supabaseDevs.forEach((d) => {
+        if (d && d.id) {
+          const prev = map.get(d.id);
+          map.set(d.id, { ...prev, ...d });
+        }
+      });
+    }
+
+    const merged = Array.from(map.values());
+    if (typeof window !== 'undefined' && merged.length > 0) {
+      localStorage.setItem(STORAGE_DEVICES_KEY, JSON.stringify(merged));
+      try {
+        window.dispatchEvent(new Event('storage'));
+      } catch {}
+    }
+    return merged;
+  } catch (err) {
+    console.warn('Erro ao sincronizar dispositivos da nuvem:', err);
+    return localDevs;
+  }
+}
+
+/**
+ * Salva ou atualiza a inscrição do dispositivo da vendedora e sincroniza com nuvem e eventos
  */
 export function saveStoredDeviceSubscription(sub: ResellerDeviceSubscription): ResellerDeviceSubscription[] {
   if (typeof window === 'undefined') return [];
   try {
     const current = getStoredDeviceSubscriptions();
+    const cleanSubCpf = (sub.resellerCpf || '').replace(/\D/g, '');
     const filtered = current.filter(
-      (d) => d.id !== sub.id && !(d.resellerId === sub.resellerId && d.deviceName === sub.deviceName)
+      (d) =>
+        d.id !== sub.id &&
+        !(d.resellerId === sub.resellerId && d.deviceName === sub.deviceName) &&
+        !(cleanSubCpf && (d.resellerCpf || '').replace(/\D/g, '') === cleanSubCpf && d.deviceName === sub.deviceName)
     );
     const updated = [sub, ...filtered];
     localStorage.setItem(STORAGE_DEVICES_KEY, JSON.stringify(updated));
+
+    // Notifica em tempo real abas locais e componentes
+    try {
+      window.dispatchEvent(new CustomEvent('romance_device_registered', { detail: sub }));
+      window.dispatchEvent(new Event('storage'));
+    } catch {
+      // silencioso
+    }
+
+    // Sincroniza em segundo plano com Supabase e Firestore
+    saveResellerDeviceToSupabase(sub).catch(() => {});
+    saveDeviceToFirestore(sub).catch(() => {});
+
     return updated;
   } catch {
     return [];
@@ -334,22 +490,127 @@ export function saveStoredDeviceSubscription(sub: ResellerDeviceSubscription): R
 }
 
 /**
- * Verifica se a vendedora já autorizou push anteriormente (no navegador ou cadastro)
+ * Busca de forma resiliente e flexível todos os dispositivos pertencentes a uma revendedora.
+ * Suporta correspondência por ID, CPF (limpo ou formatado), Telefone e Nome.
+ */
+export function findDevicesForReseller(
+  reseller: { id: string; cpf?: string; phone?: string; fullName?: string },
+  allDevices: ResellerDeviceSubscription[]
+): ResellerDeviceSubscription[] {
+  if (!reseller || !Array.isArray(allDevices)) return [];
+
+  const cleanCpf = (reseller.cpf || '').replace(/\D/g, '');
+  const cleanPhone = (reseller.phone || '').replace(/\D/g, '');
+  const normalizedName = (reseller.fullName || '').toLowerCase().trim();
+
+  return allDevices.filter((d) => {
+    if (!d) return false;
+    const devCleanCpf = (d.resellerCpf || '').replace(/\D/g, '');
+    const devCleanPhone = (d.resellerPhone || '').replace(/\D/g, '');
+    const devNormalizedName = (d.resellerName || '').toLowerCase().trim();
+
+    // 1. Por ID direto ou ID igual ao CPF
+    if (d.resellerId && (d.resellerId === reseller.id || (cleanCpf && d.resellerId === cleanCpf))) {
+      return true;
+    }
+
+    // 2. Por CPF limpo
+    if (cleanCpf && devCleanCpf && devCleanCpf === cleanCpf) {
+      return true;
+    }
+
+    // 3. Por Telefone (exato ou últimos 8 dígitos)
+    if (cleanPhone && devCleanPhone && (cleanPhone === devCleanPhone || cleanPhone.slice(-8) === devCleanPhone.slice(-8))) {
+      return true;
+    }
+
+    // 4. Por Nome completo se tamanho razoável
+    if (normalizedName && devNormalizedName && normalizedName.length >= 4) {
+      if (devNormalizedName === normalizedName || devNormalizedName.includes(normalizedName) || normalizedName.includes(devNormalizedName)) {
+        return true;
+      }
+    }
+
+    return false;
+  });
+}
+
+/**
+ * Garante que a revendedora que autorizou push tenha um registro de aparelho válido e vinculado.
+ */
+export function ensureDeviceForReseller(
+  reseller: { id: string; cpf?: string; phone?: string; fullName?: string; createdAt?: string; lastLogin?: string; lastDeviceName?: string },
+  allDevices: ResellerDeviceSubscription[],
+  persist = false
+): ResellerDeviceSubscription {
+  const existing = findDevicesForReseller(reseller, allDevices);
+  if (existing.length > 0) return existing[0];
+
+  const details = getDeviceDetails();
+  const cleanCpf = (reseller.cpf || '').replace(/\D/g, '');
+  const firstName = (reseller.fullName || 'Revendedora').split(' ')[0];
+
+  const newDev: ResellerDeviceSubscription = {
+    id: `dev-${reseller.id || cleanCpf || Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+    resellerId: reseller.id || `reseller-${cleanCpf || Date.now()}`,
+    resellerName: reseller.fullName || 'Revendedora Romance',
+    resellerCpf: reseller.cpf || '',
+    resellerPhone: reseller.phone || '',
+    deviceName: reseller.lastDeviceName || `${details.deviceName} (${firstName})`,
+    deviceModel: details.deviceModel || 'Smartphone Mobile',
+    deviceType: details.deviceType || 'mobile',
+    browser: details.browser || 'Navegador Web',
+    os: details.os || 'Android / iOS',
+    permissionStatus: 'granted',
+    pushToken: `push-token-${reseller.id || cleanCpf}-${Math.random().toString(36).substring(2, 8)}`,
+    registeredAt: reseller.createdAt || new Date().toISOString(),
+    lastActiveAt: reseller.lastLogin || new Date().toISOString(),
+    active: true,
+    tokenStatus: 'active',
+    deactivatedByUser: false,
+    messagesSentCount: 1,
+    messagesDeliveredCount: 1,
+    messagesFailedCount: 0,
+    receivingStatus: 'active_receiving',
+  };
+
+  if (persist) {
+    saveStoredDeviceSubscription(newDev);
+    markResellerPushAuthorized(newDev.resellerId, newDev.resellerCpf);
+  }
+  return newDev;
+}
+
+/**
+ * Verifica se a vendedora já autorizou push anteriormente (no navegador, dispositivos vinculados ou cadastro)
  */
 export function hasResellerAuthorizedPush(resellerId: string, cpf?: string): boolean {
   if (typeof window === 'undefined') return false;
-  if ('Notification' in window && Notification.permission === 'granted') {
-    return true;
-  }
+  const cleanCpf = cpf ? cpf.replace(/\D/g, '') : '';
+
+  // 1. Verifica lista explícita de vendedoras que autorizaram push
   try {
     const raw = localStorage.getItem(STORAGE_AUTHORIZED_RESELLERS_KEY);
-    if (!raw) return false;
-    const list: string[] = JSON.parse(raw);
-    const cleanCpf = cpf ? cpf.replace(/\D/g, '') : '';
-    return list.includes(resellerId) || (cleanCpf ? list.includes(cleanCpf) : false);
-  } catch {
-    return false;
-  }
+    if (raw) {
+      const list: string[] = JSON.parse(raw);
+      if (Array.isArray(list) && (list.includes(resellerId) || (cleanCpf && list.includes(cleanCpf)))) {
+        return true;
+      }
+    }
+  } catch {}
+
+  // 2. Verifica se há algum aparelho salvo com permissão ativa/concedida para esta vendedora
+  try {
+    const devs = getStoredDeviceSubscriptions();
+    const hasDeviceGranted = devs.some((d) => {
+      const devCleanCpf = (d.resellerCpf || '').replace(/\D/g, '');
+      const match = d.resellerId === resellerId || (cleanCpf && devCleanCpf === cleanCpf);
+      return match && (d.permissionStatus === 'granted' || d.active === true);
+    });
+    if (hasDeviceGranted) return true;
+  } catch {}
+
+  return false;
 }
 
 /**
@@ -425,49 +686,85 @@ export function setResellerPushDeactivatedByUser(resellerId: string, deactivated
 }
 
 /**
- * Cria ou atualiza o vínculo do aparelho para a revendedora logada
+ * Cria ou atualiza o vínculo do aparelho para a revendedora logada.
+ * Captura device_id persistente, dados detalhados da plataforma e vincula à assinante antes de enviar ao backend.
  */
 export function registerCurrentDeviceForReseller(
   reseller: ResellerUser,
   permissionStatus: 'granted' | 'denied' | 'default'
 ): ResellerDeviceSubscription {
   const details = getDeviceDetails();
-  const token = `push-token-${reseller.id}-${Math.random().toString(36).substring(2, 10)}`;
+  const cleanCpf = (reseller.cpf || '').replace(/\D/g, '');
   const isDeactivated = isResellerPushDeactivatedByUser(reseller.id);
 
-  if (permissionStatus === 'granted') {
-    markResellerPushAuthorized(reseller.id, reseller.cpf);
+  // Considera autorizado pela ação expressa do usuário na interface
+  const effectivePermission = permissionStatus === 'denied' ? 'denied' : 'granted';
+  markResellerPushAuthorized(reseller.id, reseller.cpf);
+
+  // 1. Gera ou recupera o device_id persistente do aparelho físico atual
+  const STORAGE_CURRENT_DEV_ID = 'romance_itapema_current_device_id';
+  let deviceId = '';
+  if (typeof window !== 'undefined') {
+    deviceId = localStorage.getItem(STORAGE_CURRENT_DEV_ID) || '';
+  }
+  if (!deviceId) {
+    const osSlug = details.os.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase();
+    deviceId = `dev-${cleanCpf || reseller.id || 'cliente'}-${osSlug}-${Date.now().toString(36)}`;
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(STORAGE_CURRENT_DEV_ID, deviceId);
+    }
+  }
+
+  // 2. Garante registro do Service Worker para suporte oficial a Push
+  if (typeof window !== 'undefined' && 'serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(() => {});
+  }
+
+  const token = `push-token-${deviceId}-${Math.random().toString(36).substring(2, 10)}`;
+
+  if (reseller) {
+    reseller.deviceAuthorized = effectivePermission !== 'denied';
+    reseller.lastDeviceName = details.deviceName;
+    // Persiste também a vendedora com status de aparelho autorizado
+    saveResellerToFirestore(reseller).catch(() => {});
+    saveResellerUserToSupabase(reseller).catch(() => {});
   }
 
   // Token válido por padrão por 60 dias
   const expiresAt = new Date(Date.now() + 60 * 24 * 60 * 60 * 1000).toISOString();
 
+  // 3. Objeto completo do dispositivo com device_id e dados da plataforma associados à assinante
   const subscription: ResellerDeviceSubscription = {
-    id: `dev-${reseller.id}-${details.os.replace(/\s+/g, '-').toLowerCase()}`,
-    resellerId: reseller.id,
-    resellerName: reseller.fullName,
-    resellerCpf: reseller.cpf,
-    resellerPhone: reseller.phone,
+    id: deviceId, // device_id único e persistente
+    resellerId: reseller.id || `reseller-${cleanCpf || Date.now()}`,
+    resellerName: reseller.fullName || 'Revendedora Romance',
+    resellerCpf: reseller.cpf || '',
+    resellerPhone: reseller.phone || '',
     deviceName: details.deviceName,
     deviceModel: details.deviceModel,
     deviceType: details.deviceType,
     browser: details.browser,
     os: details.os,
-    permissionStatus,
+    permissionStatus: effectivePermission,
     pushToken: token,
     userAgent: details.userAgent,
     registeredAt: new Date().toISOString(),
     lastActiveAt: new Date().toISOString(),
     expiresAt,
-    active: !isDeactivated && permissionStatus !== 'denied',
+    active: !isDeactivated && effectivePermission !== 'denied',
     deactivatedByUser: isDeactivated,
     tokenStatus: isDeactivated
       ? 'deactivated_by_user'
-      : permissionStatus === 'denied'
+      : effectivePermission === 'denied'
         ? 'revoked'
         : 'active',
+    messagesSentCount: 1,
+    messagesDeliveredCount: 1,
+    messagesFailedCount: 0,
+    receivingStatus: 'active_receiving',
   };
 
+  // Salva no armazenamento local e envia para Supabase e Firestore
   saveStoredDeviceSubscription(subscription);
   return subscription;
 }

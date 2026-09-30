@@ -194,9 +194,13 @@ export function RomanceEstrelas({ settings, onScrollToForm }: RomanceEstrelasPro
 
   return (
     <section 
-      id="romance-estrelas" 
-      className="py-20 relative overflow-hidden bg-stone-950 text-white border-y border-amber-500/30"
+      id="romance-estrelas-parcelamento" 
+      className="py-20 relative overflow-hidden bg-stone-950 text-white border-y border-amber-500/30 scroll-mt-24"
     >
+      {/* Anchors for legacy links */}
+      <div id="romance-estrelas" className="absolute -top-24 left-0" />
+      <div id="estrelas-romance" className="absolute -top-24 left-0" />
+      
       {/* Golden & Rose Ambient Glows */}
       <div className="absolute top-0 left-1/3 -mt-28 w-[500px] h-[500px] rounded-full bg-gradient-to-br from-amber-500/20 via-rose-500/15 to-purple-600/10 blur-3xl pointer-events-none" />
       <div className="absolute bottom-0 right-1/4 -mb-28 w-[500px] h-[500px] rounded-full bg-gradient-to-tr from-rose-600/20 via-pink-600/15 to-amber-500/10 blur-3xl pointer-events-none" />
@@ -212,11 +216,11 @@ export function RomanceEstrelas({ settings, onScrollToForm }: RomanceEstrelasPro
           </div>
 
           <h2 className="font-serif-luxury text-3xl sm:text-4xl lg:text-5xl font-bold tracking-tight text-white leading-tight">
-            Promoção <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-300 to-amber-200">Estrelas Romance 2026</span>
+            Romance Estrelas & Regras de Parcelamento • <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-300 via-rose-300 to-amber-200">Campanha Oficial Crisdu Romance e Favorita</span>
           </h2>
 
           <p className="text-stone-300 text-sm sm:text-base lg:text-lg leading-relaxed max-w-3xl mx-auto">
-            Concorra a <strong className="text-amber-300 font-semibold">1 Carro 0km</strong>, <strong className="text-amber-300 font-semibold">20 Motos</strong> e <strong className="text-amber-300 font-semibold">Mais de R$ 450 Mil em Prêmios</strong> exclusivos para empreendedoras e consultoras independentes!
+            Participe da maior premiação do Brasil para revendedoras independentes: <strong className="text-amber-300 font-semibold">1 Carro 0km, 20 Motos e Mais de R$ 450 Mil em Prêmios</strong>, com prazos especiais de <strong className="text-amber-300 font-semibold">14 a 90 dias</strong> e <strong className="text-amber-300 font-semibold">parcelamento em até 3x sem juros</strong> no Catálogo Favorita!
           </p>
 
           {/* Quick Stats Highlights */}

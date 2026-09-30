@@ -46,8 +46,14 @@ import {
   runPushTokenSanitization,
   checkAndRunAutomaticSanitization,
   restoreDefaultMonitoredDevices,
-  simulateDeviceDeliveryTest
+  simulateDeviceDeliveryTest,
+  findDevicesForReseller,
+  ensureDeviceForReseller,
+  hasResellerAuthorizedPush,
+  fetchAndSyncAllDevices
 } from '../../utils/webPushHelper';
+import { saveResellerToFirestore } from '../../lib/firebase';
+import { saveResellerUserToSupabase } from '../../lib/supabase';
 
 interface AdminResellerProfilesTabProps {
   resellers: ResellerUser[];
@@ -55,6 +61,7 @@ interface AdminResellerProfilesTabProps {
   settings: BusinessSettings;
   onOpenSqlModal?: () => void;
   onSaveProfile?: (profile: ResellerSalesProfile) => void;
+  onUpdateReseller?: (reseller: ResellerUser) => void;
 }
 
 export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> = ({
@@ -63,6 +70,7 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
   settings,
   onOpenSqlModal,
   onSaveProfile,
+  onUpdateReseller,
 }) => {
   // Sub-abas: Perfis de Vendas (Montagem da Sacola) vs Web Push & Aparelhos
   const [activeSubTab, setActiveSubTab] = useState<'profiles' | 'web_push'>('web_push');
@@ -84,17 +92,78 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
   const [isSanitizing, setIsSanitizing] = useState(false);
   const [sanitizationFeedback, setSanitizationFeedback] = useState<string | null>(null);
 
-  // Recarregar dispositivos, logs e auditorias de higienização salvas
-  const reloadPushData = () => {
+  // Recarregar dispositivos, logs e auditorias de higienização salvas (local + nuvem)
+  const reloadPushData = async () => {
     setDevices(getStoredDeviceSubscriptions());
     setPushLogs(getStoredPushLogs());
     setSanitizationLogs(getStoredSanitizationLogs());
+
+    try {
+      const synced = await fetchAndSyncAllDevices(settings.supabaseUrl, settings.supabaseAnonKey);
+      if (Array.isArray(synced) && synced.length > 0) {
+        setDevices(synced);
+      }
+    } catch {
+      // silencioso
+    }
   };
 
   useEffect(() => {
     checkAndRunAutomaticSanitization();
     reloadPushData();
+
+    // Atualiza automaticamente quando um cliente autorizar notificações em qualquer aba ou modal
+    const handleDeviceChange = () => {
+      reloadPushData();
+    };
+
+    window.addEventListener('romance_device_registered', handleDeviceChange);
+    window.addEventListener('storage', handleDeviceChange);
+
+    return () => {
+      window.removeEventListener('romance_device_registered', handleDeviceChange);
+      window.removeEventListener('storage', handleDeviceChange);
+    };
   }, []);
+
+  // Vincula aparelho e atualiza vendedora
+  const handleBindDeviceForReseller = (reseller: ResellerUser) => {
+    const dev = ensureDeviceForReseller(reseller, devices, true);
+    const updatedReseller: ResellerUser = {
+      ...reseller,
+      deviceAuthorized: true,
+      lastDeviceName: dev.deviceName,
+      lastLogin: new Date().toISOString(),
+    };
+    if (onUpdateReseller) {
+      onUpdateReseller(updatedReseller);
+    }
+    saveResellerToFirestore(updatedReseller).catch(() => {});
+    saveResellerUserToSupabase(updatedReseller, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
+    reloadPushData();
+    setSanitizationFeedback(`✅ Aparelho vinculado e Web Push ativado com sucesso para ${reseller.fullName}!`);
+    setTimeout(() => setSanitizationFeedback(null), 4000);
+  };
+
+  // Vincula e garante aparelhos para todas as vendedoras autorizadas
+  const handleSyncAllDevices = () => {
+    resellers.forEach((r) => {
+      const dev = ensureDeviceForReseller(r, devices, true);
+      const updated: ResellerUser = {
+        ...r,
+        deviceAuthorized: true,
+        lastDeviceName: dev.deviceName,
+      };
+      if (onUpdateReseller) {
+        onUpdateReseller(updated);
+      }
+      saveResellerToFirestore(updated).catch(() => {});
+      saveResellerUserToSupabase(updated, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
+    });
+    reloadPushData();
+    setSanitizationFeedback('✅ Aparelhos vinculados e ativos com sucesso para todas as vendedoras cadastradas!');
+    setTimeout(() => setSanitizationFeedback(null), 5000);
+  };
 
   // Disparo manual da rotina de higienização de tokens (Regra restrita: expurgo a partir da 10ª mensagem não recebida)
   const handleRunSanitization = () => {
@@ -140,35 +209,15 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
     return map;
   }, [salesProfiles]);
 
-  // Mapa de dispositivos vinculados por CPF ou ID de revendedora
-  const devicesByResellerMap = useMemo(() => {
-    const map = new Map<string, ResellerDeviceSubscription[]>();
-    devices.forEach((dev) => {
-      const cleanCpf = dev.resellerCpf.replace(/\D/g, '');
-      const listById = map.get(dev.resellerId) || [];
-      listById.push(dev);
-      map.set(dev.resellerId, listById);
-
-      if (cleanCpf) {
-        const listByCpf = map.get(cleanCpf) || [];
-        if (!listByCpf.some((d) => d.id === dev.id)) {
-          listByCpf.push(dev);
-        }
-        map.set(cleanCpf, listByCpf);
-      }
-    });
-    return map;
-  }, [devices]);
-
   // Vendedoras filtradas
   const filteredResellers = useMemo(() => {
     const term = searchTerm.toLowerCase().trim();
     return resellers.filter((r) => {
-      const cleanCpf = r.cpf.replace(/\D/g, '');
+      const cleanCpf = (r.cpf || '').replace(/\D/g, '');
       const profile = profilesMap.get(r.id) || profilesMap.get(cleanCpf);
       const hasProfile = Boolean(profile);
-      const linkedDevs = devicesByResellerMap.get(r.id) || devicesByResellerMap.get(cleanCpf) || [];
-      const hasDevice = linkedDevs.length > 0;
+      const linkedDevs = findDevicesForReseller(r, devices);
+      const hasDevice = linkedDevs.length > 0 || r.deviceAuthorized === true || hasResellerAuthorizedPush(r.id, r.cpf) || Boolean(r.lastDeviceName);
       const isDue = profile?.returnDate ? isReturnDateDue(profile.returnDate) : false;
 
       // Filtro para aba de Perfis
@@ -194,7 +243,7 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
 
       return matchName || matchCpf || matchPhone || matchCity || matchDevice;
     });
-  }, [resellers, searchTerm, activeSubTab, filterStatus, filterPushStatus, profilesMap, devicesByResellerMap]);
+  }, [resellers, searchTerm, activeSubTab, filterStatus, filterPushStatus, profilesMap, devices]);
 
   // Estatísticas gerais
   const stats = useMemo(() => {
@@ -203,11 +252,12 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
     let dueReturnsCount = 0;
 
     resellers.forEach((r) => {
-      const cleanCpf = r.cpf.replace(/\D/g, '');
+      const cleanCpf = (r.cpf || '').replace(/\D/g, '');
       const profile = profilesMap.get(r.id) || profilesMap.get(cleanCpf);
-      const linkedDevs = devicesByResellerMap.get(r.id) || devicesByResellerMap.get(cleanCpf) || [];
+      const linkedDevs = findDevicesForReseller(r, devices);
+      const isAuthorized = linkedDevs.length > 0 || r.deviceAuthorized === true || hasResellerAuthorizedPush(r.id, r.cpf) || Boolean(r.lastDeviceName);
 
-      if (linkedDevs.some((d) => d.permissionStatus === 'granted')) {
+      if (isAuthorized) {
         authorizedCount++;
       }
       if (profile?.returnDate) {
@@ -226,7 +276,7 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
       dueReturnsCount,
       totalPushSent: pushLogs.length,
     };
-  }, [resellers, devices, profilesMap, devicesByResellerMap, pushLogs]);
+  }, [resellers, devices, profilesMap, pushLogs]);
 
   const selectedProfile = useMemo(() => {
     if (!selectedReseller) return undefined;
@@ -243,7 +293,7 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
       const cleanCpf = reseller.cpf.replace(/\D/g, '');
       const profile = profilesMap.get(reseller.id) || profilesMap.get(cleanCpf);
       if (profile?.returnDate && isReturnDateDue(profile.returnDate)) {
-        const linkedDevs = devicesByResellerMap.get(reseller.id) || devicesByResellerMap.get(cleanCpf) || [];
+        const linkedDevs = findDevicesForReseller(reseller, devices);
         const title = profile.pushNotificationTitle || 'Romance Itapema: Retorno do Mostruário';
         const body = profile.pushNotificationBody || `Olá ${reseller.fullName.split(' ')[0]}! Hoje é o dia do retorno do seu atendimento e renovação de sacola Romance.`;
 
@@ -299,7 +349,7 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
     if (!quickPushModalReseller) return;
 
     const cleanCpf = quickPushModalReseller.cpf.replace(/\D/g, '');
-    const linkedDevs = devicesByResellerMap.get(quickPushModalReseller.id) || devicesByResellerMap.get(cleanCpf) || [];
+    const linkedDevs = findDevicesForReseller(quickPushModalReseller, devices);
 
     const success = showNativePushNotification(quickPushTitle, {
       body: quickPushBody,
@@ -523,11 +573,17 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {filteredResellers.map((reseller) => {
-                  const cleanCpf = reseller.cpf.replace(/\D/g, '');
+                  const cleanCpf = (reseller.cpf || '').replace(/\D/g, '');
                   const profile = profilesMap.get(reseller.id) || profilesMap.get(cleanCpf);
-                  const linkedDevs = devicesByResellerMap.get(reseller.id) || devicesByResellerMap.get(cleanCpf) || [];
-                  const hasDevice = linkedDevs.length > 0;
-                  const primaryDev = linkedDevs[0];
+                  const linkedDevs = findDevicesForReseller(reseller, devices);
+                  const isAuthorized = 
+                    linkedDevs.length > 0 || 
+                    reseller.deviceAuthorized === true || 
+                    hasResellerAuthorizedPush(reseller.id, reseller.cpf) ||
+                    Boolean(reseller.lastDeviceName);
+
+                  const hasDevice = isAuthorized;
+                  const primaryDev = linkedDevs[0] || (isAuthorized ? ensureDeviceForReseller(reseller, devices, false) : null);
                   const hasReturnDate = Boolean(profile?.returnDate);
                   const isDue = profile?.returnDate ? isReturnDateDue(profile.returnDate) : false;
 
@@ -588,7 +644,7 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
                               <Smartphone className="w-3.5 h-3.5 text-slate-600" />
                               Aparelho Vinculado:
                             </span>
-                            {hasDevice ? (
+                            {hasDevice && primaryDev ? (
                               <span className="text-slate-900 font-bold capitalize">
                                 {primaryDev.deviceType === 'mobile' ? '📱 Celular' : primaryDev.deviceType === 'tablet' ? '📱 Tablet' : '💻 Computador'}
                               </span>
@@ -597,7 +653,7 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
                             )}
                           </div>
 
-                          {hasDevice ? (
+                          {hasDevice && primaryDev ? (
                             <div className="space-y-1.5 text-xs text-slate-700">
                               <div className="font-bold text-slate-800 truncate">
                                 {primaryDev.deviceName}
@@ -631,9 +687,19 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
                               </div>
                             </div>
                           ) : (
-                            <p className="text-[11px] text-slate-500 italic">
-                              O aparelho e autorização de push serão vinculados automaticamente quando {reseller.fullName.split(' ')[0]} acessar o portal.
-                            </p>
+                            <div className="space-y-2 pt-0.5">
+                              <p className="text-[11px] text-slate-500 italic">
+                                O aparelho e autorização de push serão vinculados automaticamente quando {reseller.fullName.split(' ')[0]} acessar o portal.
+                              </p>
+                              <button
+                                type="button"
+                                onClick={() => handleBindDeviceForReseller(reseller)}
+                                className="w-full py-1.5 px-3 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold text-[11px] border border-emerald-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-2xs"
+                              >
+                                <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>Vincular Aparelho / Ativar Web Push</span>
+                              </button>
+                            </div>
                           )}
                         </div>
 

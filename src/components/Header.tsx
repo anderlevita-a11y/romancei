@@ -34,6 +34,7 @@ interface HeaderProps {
   onOpenShare?: () => void;
   onOpenReferralModal?: () => void;
   onOpenResellerPortal?: () => void;
+  onOpenPackagedSection?: (sectionId: string) => void;
   currentReseller?: ResellerUser | null;
 }
 
@@ -47,13 +48,24 @@ export function Header({
   onOpenShare,
   onOpenReferralModal,
   onOpenResellerPortal,
+  onOpenPackagedSection,
   currentReseller,
 }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { isInstallable, isInstalled, install } = usePWAInstall();
 
+  const PACKAGED_HEADER_MAP: Record<string, string> = {
+    'como-funciona': 'guia-revendedora',
+    'simulador-lucro': 'segredo-lucro',
+    'estrelas-romance': 'romance-estrelas',
+  };
+
   const handleNavClick = (sectionId: string) => {
     setIsMobileMenuOpen(false);
+    if (onOpenPackagedSection && PACKAGED_HEADER_MAP[sectionId]) {
+      onOpenPackagedSection(PACKAGED_HEADER_MAP[sectionId]);
+      return;
+    }
     const element = document.getElementById(sectionId);
     if (element) {
       element.scrollIntoView({ behavior: 'smooth' });

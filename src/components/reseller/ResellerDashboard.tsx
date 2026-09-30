@@ -43,6 +43,7 @@ interface ResellerDashboardProps {
   salesProfile?: ResellerSalesProfile;
   settings: BusinessSettings;
   onSaveProfile: (profile: ResellerSalesProfile) => void;
+  onUpdateReseller?: (reseller: ResellerUser) => void;
   onLogout: () => void;
   onBackToSite: () => void;
 }
@@ -52,6 +53,7 @@ export const ResellerDashboard: React.FC<ResellerDashboardProps> = ({
   salesProfile,
   settings,
   onSaveProfile,
+  onUpdateReseller,
   onLogout,
   onBackToSite,
 }) => {
@@ -167,19 +169,26 @@ export const ResellerDashboard: React.FC<ResellerDashboardProps> = ({
     try {
       const perm = await requestPushPermission();
       setPushPermission(perm);
-      registerCurrentDeviceForReseller(currentReseller, perm);
+      const sub = registerCurrentDeviceForReseller(currentReseller, perm);
 
-      if (perm === 'granted') {
-        markResellerPushAuthorized(currentReseller.id, currentReseller.cpf);
-        setIsAuthorized(true);
-        setIsDeactivatedByUser(false);
-        showNativePushNotification('Romance Itapema: Notificações Ativadas!', {
-          body: `Seu aparelho (${deviceInfo.deviceName}) está vinculado. Você receberá avisos da sua sacola aqui.`,
-        });
-        setPushFeedback('✅ Notificações Web Push autorizadas com sucesso! Não será necessário ativar novamente.');
-      } else {
-        setPushFeedback('ℹ️ Permissão mantida no estado atual do navegador.');
+      markResellerPushAuthorized(currentReseller.id, currentReseller.cpf);
+      setIsAuthorized(true);
+      setIsDeactivatedByUser(false);
+
+      const updated: ResellerUser = {
+        ...currentReseller,
+        deviceAuthorized: true,
+        lastDeviceName: sub.deviceName,
+        lastLogin: new Date().toISOString(),
+      };
+      if (onUpdateReseller) {
+        onUpdateReseller(updated);
       }
+
+      showNativePushNotification('Romance Itapema: Notificações Ativadas!', {
+        body: `Seu aparelho (${deviceInfo.deviceName}) está vinculado. Você receberá avisos da sua sacola aqui.`,
+      });
+      setPushFeedback('✅ Notificações Web Push autorizadas com sucesso! Não será necessário ativar novamente.');
     } catch {
       // silencioso
     } finally {
