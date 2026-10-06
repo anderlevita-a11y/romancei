@@ -330,6 +330,17 @@ export default function App() {
 
   // Track recently deleted media IDs locally to avoid resurrecting deleted items during cloud polling
   const recentlyDeletedMediaIds = useRef<Set<string>>(new Set());
+  const initialBatchSyncDoneRef = useRef(false);
+
+  const isDeepEqual = (a: any, b: any) => {
+    if (a === b) return true;
+    if (!a || !b) return false;
+    try {
+      return JSON.stringify(a) === JSON.stringify(b);
+    } catch {
+      return false;
+    }
+  };
 
   const handleToggleSound = () => {
     setNotificationSoundEnabled((prev) => {
@@ -583,7 +594,7 @@ export default function App() {
                 merged.push(localLead);
               }
             }
-            return merged;
+            return isDeepEqual(prev, merged) ? prev : merged;
           });
         }
         if (Array.isArray(cloudData.orders)) {
@@ -596,7 +607,7 @@ export default function App() {
                 merged.push(localOrder);
               }
             }
-            return merged;
+            return isDeepEqual(prev, merged) ? prev : merged;
           });
         }
         if (Array.isArray(cloudData.coupons)) {
@@ -609,7 +620,7 @@ export default function App() {
                 merged.push(localCoupon);
               }
             }
-            return merged;
+            return isDeepEqual(prev, merged) ? prev : merged;
           });
         }
         if (Array.isArray(cloudData.adminUsers)) {
@@ -622,14 +633,15 @@ export default function App() {
                 merged.push(localUser);
               }
             }
-            return merged;
+            return isDeepEqual(prev, merged) ? prev : merged;
           });
         }
         if (Array.isArray(cloudData.mediaItems)) {
           setMediaItems((prev) => {
             if (cloudData.mediaItems!.length === 0) {
-              // Se o Supabase estiver vazio, mantém itens locais e tenta enviá-los em lote para a nuvem
-              if (prev.length > 0) {
+              // Se o Supabase estiver vazio, envia os itens locais apenas uma vez na inicialização
+              if (!initialBatchSyncDoneRef.current && prev.length > 0) {
+                initialBatchSyncDoneRef.current = true;
                 syncAllMediaItemsToSupabase(prev, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
               }
               return prev;
@@ -649,13 +661,13 @@ export default function App() {
                 syncMediaItemToSupabase(localItem, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
               }
             }
-            return merged;
+            return isDeepEqual(prev, merged) ? prev : merged;
           });
         }
         if (Array.isArray(cloudData.testimonials)) {
           setTestimonials((prev) => {
             if (cloudData.testimonials!.length === 0) {
-              if (prev.length > 0) {
+              if (!initialBatchSyncDoneRef.current && prev.length > 0) {
                 syncAllTestimonialsToSupabase(prev, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
               }
               return prev;
@@ -668,7 +680,7 @@ export default function App() {
                 syncTestimonialToSupabase(localItem, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
               }
             }
-            return merged;
+            return isDeepEqual(prev, merged) ? prev : merged;
           });
         }
         if (Array.isArray(cloudData.commercialLines)) {
@@ -695,7 +707,7 @@ export default function App() {
                 merged.push(localLine);
               }
             }
-            return merged;
+            return isDeepEqual(prev, merged) ? prev : merged;
           });
         }
         if (Array.isArray(cloudData.resellers)) {
@@ -708,7 +720,7 @@ export default function App() {
                 merged.push(localReseller);
               }
             }
-            return merged;
+            return isDeepEqual(prev, merged) ? prev : merged;
           });
         }
         if (Array.isArray(cloudData.salesProfiles)) {
@@ -721,7 +733,7 @@ export default function App() {
                 merged.push(localProfile);
               }
             }
-            return merged;
+            return isDeepEqual(prev, merged) ? prev : merged;
           });
         }
         if (Array.isArray(cloudData.devices) && cloudData.devices.length > 0) {
@@ -730,7 +742,9 @@ export default function App() {
           stored.forEach((d) => devMap.set(d.id, d));
           cloudData.devices.forEach((d) => devMap.set(d.id, { ...devMap.get(d.id), ...d }));
           const mergedDevs = Array.from(devMap.values());
-          localStorage.setItem('romance_itapema_reseller_devices', JSON.stringify(mergedDevs));
+          if (!isDeepEqual(stored, mergedDevs)) {
+            localStorage.setItem('romance_itapema_reseller_devices', JSON.stringify(mergedDevs));
+          }
         }
 
         // Busca complementar de dispositivos no Firestore
@@ -741,18 +755,23 @@ export default function App() {
             stored.forEach((d) => devMap.set(d.id, d));
             fDevs.forEach((d) => devMap.set(d.id, { ...devMap.get(d.id), ...d }));
             const mergedDevs = Array.from(devMap.values());
-            localStorage.setItem('romance_itapema_reseller_devices', JSON.stringify(mergedDevs));
+            if (!isDeepEqual(stored, mergedDevs)) {
+              localStorage.setItem('romance_itapema_reseller_devices', JSON.stringify(mergedDevs));
+            }
           }
         }).catch(() => {});
 
         if (cloudData.settings && Object.keys(cloudData.settings).length > 0) {
-          setSettings((prev) => ({
-            ...prev,
-            ...cloudData.settings,
-            supabaseUrl: prev.supabaseUrl,
-            supabaseAnonKey: prev.supabaseAnonKey,
-            supabaseConnected: true,
-          }));
+          setSettings((prev) => {
+            const next = {
+              ...prev,
+              ...cloudData.settings,
+              supabaseUrl: prev.supabaseUrl,
+              supabaseAnonKey: prev.supabaseAnonKey,
+              supabaseConnected: true,
+            };
+            return isDeepEqual(prev, next) ? prev : next;
+          });
         }
       } catch (err) {
         console.warn('Realtime cloud sync notice:', err);
@@ -912,10 +931,12 @@ export default function App() {
     window.addEventListener('focus', handleFocusOrVisible);
     document.addEventListener('visibilitychange', handleFocusOrVisible);
 
-    // 4. Polling periódico de segurança (a cada 10s) para garantir sincronismo no ambiente de desenvolvimento
+    // 4. Polling periódico de segurança em segundo plano (60s)
     const pollingInterval = setInterval(() => {
-      refreshAllData(false);
-    }, 10000);
+      if (document.visibilityState === 'visible') {
+        refreshAllData(false);
+      }
+    }, 60000);
 
     return () => {
       isMounted = false;
@@ -1464,37 +1485,37 @@ export default function App() {
   };
 
   // Navigation and scroll helpers
-  const scrollToForm = (presetMessage?: string) => {
+  const scrollToForm = useCallback((presetMessage?: string) => {
     const el = document.getElementById('cadastro');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     }
-  };
+  }, []);
 
-  const scrollToHowItWorks = () => {
+  const scrollToHowItWorks = useCallback(() => {
     const el = document.getElementById('como-funciona');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     }
-  };
+  }, []);
 
-  const scrollToVideos = () => {
+  const scrollToVideos = useCallback(() => {
     setActivePackagedSection(null);
     const el = document.getElementById('sessao-videos') || document.getElementById('videos-romance-play') || document.getElementById('romance-play');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     }
-  };
+  }, []);
 
-  const scrollToPhotos = () => {
+  const scrollToPhotos = useCallback(() => {
     setActivePackagedSection(null);
     const el = document.getElementById('galeria-fotos') || document.getElementById('fotos-colecoes');
     if (el) {
       el.scrollIntoView({ behavior: 'smooth' });
     }
-  };
+  }, []);
 
-  const handleOpenPackagedSection = (secId: string) => {
+  const handleOpenPackagedSection = useCallback((secId: string) => {
     if (secId === 'fotos-colecoes' || secId === 'galeria-fotos') {
       scrollToPhotos();
       return;
@@ -1504,12 +1525,16 @@ export default function App() {
       return;
     }
     setActivePackagedSection(secId);
-  };
+  }, [scrollToPhotos, scrollToVideos]);
 
-  const handleSelectPlanAndScroll = (wantsFavorita: 'sim' | 'nao') => {
+  const handleClosePackagedModal = useCallback(() => {
+    setActivePackagedSection(null);
+  }, []);
+
+  const handleSelectPlanAndScroll = useCallback((wantsFavorita: 'sim' | 'nao') => {
     setPreselectedFavorita(wantsFavorita);
     scrollToForm();
-  };
+  }, [scrollToForm]);
 
   const handleOpenAdmin = () => {
     if (isAdminAuthenticated) {
@@ -1782,8 +1807,8 @@ export default function App() {
       {/* Modal / Container das Seções Empacotadas nos Ícones (Aparecem somente ao clique) */}
       <PackagedSectionModal
         activeSection={activePackagedSection}
-        onClose={() => setActivePackagedSection(null)}
-        onSelectSection={(secId) => setActivePackagedSection(secId)}
+        onClose={handleClosePackagedModal}
+        onSelectSection={handleOpenPackagedSection}
         settings={settings}
         onScrollToForm={scrollToForm}
         onSelectPlanAndScroll={handleSelectPlanAndScroll}

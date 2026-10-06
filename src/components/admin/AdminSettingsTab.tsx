@@ -139,6 +139,7 @@ CREATE TABLE IF NOT EXISTS public.consignment_orders (
     items_count INTEGER DEFAULT 0,
     status VARCHAR(50) DEFAULT 'SEPARACAO',
     delivery_date TIMESTAMPTZ,
+    due_date TIMESTAMPTZ,
     settlement_date TIMESTAMPTZ,
     amount_sold NUMERIC(10,2) DEFAULT 0.00,
     amount_returned NUMERIC(10,2) DEFAULT 0.00,
@@ -329,6 +330,7 @@ ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS commission_rate I
 ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS items_count INTEGER DEFAULT 0;
 ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS status VARCHAR(50) DEFAULT 'SEPARACAO';
 ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS delivery_date TIMESTAMPTZ;
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ;
 ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS settlement_date TIMESTAMPTZ;
 ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS amount_sold NUMERIC(10,2) DEFAULT 0.00;
 ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS amount_returned NUMERIC(10,2) DEFAULT 0.00;

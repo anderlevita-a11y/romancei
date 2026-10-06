@@ -161,8 +161,11 @@ export function PackagedSectionModal({
   mediaItems,
 }: PackagedSectionModalProps) {
   const modalContainerRef = useRef<HTMLDivElement>(null);
+  const prevSectionRef = useRef<string | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
-  // Fecha com a tecla Escape e trava rolagem do body quando aberto
+  // Trava rolagem do body apenas enquanto o modal estiver de fato aberto
   useEffect(() => {
     if (!activeSection) return;
 
@@ -171,22 +174,32 @@ export function PackagedSectionModal({
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        onClose();
+        onCloseRef.current();
       }
     };
 
     window.addEventListener('keydown', handleKeyDown);
 
-    // Rola para o topo do modal ao trocar de seção
-    if (modalContainerRef.current) {
-      modalContainerRef.current.scrollTop = 0;
-    }
-
     return () => {
       document.body.style.overflow = originalOverflow;
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [activeSection, onClose]);
+  }, [Boolean(activeSection)]);
+
+  // Rola para o topo do modal SOMENTE quando o usuário de fato trocar para uma seção diferente
+  useEffect(() => {
+    if (!activeSection) {
+      prevSectionRef.current = null;
+      return;
+    }
+
+    if (prevSectionRef.current !== activeSection) {
+      prevSectionRef.current = activeSection;
+      if (modalContainerRef.current) {
+        modalContainerRef.current.scrollTop = 0;
+      }
+    }
+  }, [activeSection]);
 
   if (!activeSection) return null;
 

@@ -67,6 +67,15 @@ CREATE TABLE IF NOT EXISTS public.consignment_orders (
 CREATE INDEX IF NOT EXISTS idx_orders_status ON public.consignment_orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_due_date ON public.consignment_orders(due_date);
 
+-- Migrações retroativas para consignment_orders
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ;
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS delivery_date TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS settlement_date TIMESTAMPTZ;
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS kit_value NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS kit_amount NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS total_consigned NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(4,2) DEFAULT 0.30;
+
 -- ==============================================================================
 -- 4. TABELA: admin_users (Logins & Senhas de Administradores do Painel)
 -- ==============================================================================

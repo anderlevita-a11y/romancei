@@ -455,15 +455,19 @@ export const fetchOrdersFromSupabase = async (customUrl?: string, customKey?: st
   try {
     const { data, error } = await client
       .from('consignment_orders')
-      .select('*')
-      .order('due_date', { ascending: true });
+      .select('*');
 
     if (error) {
       console.warn('Erro ao buscar ordens no Supabase:', error.message);
       return null;
     }
 
-    return (data || []).map(mapOrderFromSupabase);
+    const orders = (data || []).map(mapOrderFromSupabase);
+    return orders.sort((a, b) => {
+      const timeA = new Date(a.dueDate || a.deliveryDate || 0).getTime() || 0;
+      const timeB = new Date(b.dueDate || b.deliveryDate || 0).getTime() || 0;
+      return timeA - timeB;
+    });
   } catch (e) {
     console.error('Erro em fetchOrdersFromSupabase:', e);
     return null;
@@ -1963,6 +1967,15 @@ CREATE TABLE IF NOT EXISTS public.consignment_orders (
 
 CREATE INDEX IF NOT EXISTS idx_orders_status ON public.consignment_orders(status);
 CREATE INDEX IF NOT EXISTS idx_orders_due_date ON public.consignment_orders(due_date);
+
+-- Migrações retroativas para consignment_orders
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS due_date TIMESTAMPTZ;
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS delivery_date TIMESTAMPTZ DEFAULT NOW();
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS settlement_date TIMESTAMPTZ;
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS kit_value NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS kit_amount NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS total_consigned NUMERIC(10,2) DEFAULT 0.00;
+ALTER TABLE public.consignment_orders ADD COLUMN IF NOT EXISTS commission_rate NUMERIC(4,2) DEFAULT 0.30;
 
 -- 3. TABELA: admin_users (Logins & Senhas de Administradores do Painel)
 CREATE TABLE IF NOT EXISTS public.admin_users (
