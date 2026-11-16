@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { ReferralCoupon, BusinessSettings, Lead } from '../types';
 import { isValidCPF, maskCPF, maskPhone, formatCurrency, generateCouponCode, buildWhatsAppLink } from '../utils/validators';
+import { salvarCupomPublico, consultarCupomPublico } from '../lib/seguranca';
 
 interface ReferralModalProps {
   isOpen: boolean;
@@ -98,7 +99,7 @@ export function ReferralModal({
     setConsultError('');
   };
 
-  const handleCreateSubmit = (e: React.FormEvent) => {
+  const handleCreateSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const newErrors: Record<string, string> = {};
 
@@ -151,10 +152,16 @@ export function ReferralModal({
           deliveredReferralsCount: 0,
           createdAt: new Date().toISOString(),
         };
-        if (onSaveCoupon) {
-          onSaveCoupon(newCoupon);
+        // Grava pela função segura: se o CPF já tiver cupom, o servidor devolve o existente
+        const salvo = await salvarCupomPublico(newCoupon);
+        if (!salvo) {
+          setErrors({ cpf: 'Não foi possível gerar o cupom agora. Tente novamente em instantes.' });
+          return;
         }
-        result = { coupon: newCoupon, isExisting: false };
+        if (onSaveCoupon) {
+          onSaveCoupon(salvo);
+        }
+        result = { coupon: salvo, isExisting: salvo.code !== newCoupon.code };
       }
     }
 
@@ -162,7 +169,7 @@ export function ReferralModal({
     setIsExistingNotice(result.isExisting);
   };
 
-  const handleConsultSubmit = (e: React.FormEvent) => {
+  const handleConsultSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const cleanCpf = (searchCpf || '').replace(/\D/g, '');
 
@@ -172,7 +179,15 @@ export function ReferralModal({
       return;
     }
 
-    const found = coupons.find((c) => (c.cpf || '').replace(/\D/g, '') === cleanCpf);
+    let found = coupons.find((c) => (c.cpf || '').replace(/\D/g, '') === cleanCpf);
+    let indicadasServidor: Lead[] | null = null;
+    if (!found) {
+      const r = await consultarCupomPublico(cleanCpf);
+      if (r) {
+        found = r.cupom;
+        indicadasServidor = r.indicadas;
+      }
+    }
     if (!found) {
       setConsultError('Nenhum cupom de indicação encontrado para este CPF. Gere seu cupom na aba "Gerar Meu Cupom"!');
       setConsultResult(null);
@@ -180,8 +195,9 @@ export function ReferralModal({
     }
 
     // Buscar todos os leads vinculados a este cupom
-    const relatedLeads = leads.filter(
-      (l) => l.referralCouponCode && l.referralCouponCode.toUpperCase() === found.code.toUpperCase()
+    const codigo = found.code.toUpperCase();
+    const relatedLeads = indicadasServidor ?? leads.filter(
+      (l) => l.referralCouponCode && l.referralCouponCode.toUpperCase() === codigo
     );
 
     setConsultResult({ coupon: found, referredLeads: relatedLeads });
@@ -192,7 +208,7 @@ export function ReferralModal({
     setConsultError('');
   };
 
-  const handleSavePixFromConsult = () => {
+  const handleSavePixFromConsult = async () => {
     if (!consultResult) return;
     const updatedCoupon: ReferralCoupon = {
       ...consultResult.coupon,
@@ -202,10 +218,15 @@ export function ReferralModal({
       updatedAt: new Date().toISOString(),
     };
 
-    if (onSaveCoupon) {
-      onSaveCoupon(updatedCoupon);
+    const salvo = await salvarCupomPublico(updatedCoupon);
+    if (!salvo) {
+      setConsultError('Não foi possível salvar a chave PIX agora. Tente novamente.');
+      return;
     }
-    setConsultResult({ ...consultResult, coupon: updatedCoupon });
+    if (onSaveCoupon) {
+      onSaveCoupon(salvo);
+    }
+    setConsultResult({ ...consultResult, coupon: salvo });
     setIsEditingPix(false);
     setPixSavedNotice(true);
     setTimeout(() => setPixSavedNotice(false), 3000);

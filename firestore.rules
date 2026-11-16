@@ -1,49 +1,28 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Cadastro de novas revendedoras (leads)
-    match /leads/{leadId} {
-      allow read, write: if true;
-    }
-    
-    // Gestão de kits consignados e acertos
-    match /orders/{orderId} {
-      allow read, write: if true;
+    // Dados pessoais e de gestão ficam SOMENTE no Supabase protegido.
+    // Estas coleções não são mais usadas pelo site: bloqueadas.
+    match /leads/{id}            { allow read, write: if false; }
+    match /orders/{id}           { allow read, write: if false; }
+    match /settings/{id}         { allow read, write: if false; }
+    match /admin_users/{id}      { allow read, write: if false; }
+    match /sales_profiles/{id}   { allow read, write: if false; }
+
+    // Status do aparelho da vendedora (sem CPF, telefone ou senha)
+    match /resellers/{id} {
+      allow read: if false;
+      allow write: if request.resource.data.keys().hasOnly(['id', 'active', 'deviceAuthorized', 'lastDeviceName', 'updatedAt']);
     }
 
-    // Configurações do distribuidor e regras de comissão
-    match /settings/{settingId} {
-      allow read, write: if true;
+    // Aparelhos para notificações e histórico de envios (sem CPF/telefone)
+    match /reseller_devices/{id} {
+      allow read: if true;
+      allow write: if request.resource.data.get('resellerCpf', '') == '' && request.resource.data.get('resellerPhone', '') == '';
     }
+    match /web_push_logs/{id} { allow read, write: if true; }
 
-    // Gestão de contas de administradores
-    match /admin_users/{userId} {
-      allow read, write: if true;
-    }
-
-    // Gestão de fotos, vídeos e novidades do carrossel
-    match /media_items/{mediaId} {
-      allow read, write: if true;
-    }
-
-    // Dispositivos e inscrições de Web Push das revendedoras
-    match /reseller_devices/{deviceId} {
-      allow read, write: if true;
-    }
-
-    // Contas de revendedoras cadastradas
-    match /resellers/{resellerId} {
-      allow read, write: if true;
-    }
-
-    // Perfis de atendimento e datas de retorno
-    match /sales_profiles/{profileId} {
-      allow read, write: if true;
-    }
-
-    // Logs e histórico de disparos de Web Push
-    match /web_push_logs/{logId} {
-      allow read, write: if true;
-    }
+    // Fotos e vídeos públicos do site
+    match /media_items/{id} { allow read: if true; allow write: if false; }
   }
 }

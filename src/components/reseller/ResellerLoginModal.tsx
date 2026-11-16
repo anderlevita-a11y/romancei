@@ -26,6 +26,7 @@ import {
   hasResellerAuthorizedPush,
   markResellerPushAuthorized 
 } from '../../utils/webPushHelper';
+import { entrarVendedora, cadastrarVendedora, verificarCadastroVendedora } from '../../lib/seguranca';
 
 interface ResellerLoginModalProps {
   isOpen: boolean;
@@ -59,6 +60,7 @@ export const ResellerLoginModal: React.FC<ResellerLoginModalProps> = ({
   
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Etapa de Vínculo de Aparelho & Autorização de Web Push para acessar o painel
   const [pendingUser, setPendingUser] = useState<ResellerUser | null>(null);
@@ -88,44 +90,40 @@ export const ResellerLoginModal: React.FC<ResellerLoginModalProps> = ({
   const cleanDigits = (str: string) => str.replace(/\D/g, '');
 
   // Submissão do Login
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
 
     const cleanId = cleanDigits(loginIdentifier);
-    if (!cleanId) {
-      setErrorMsg('Informe seu CPF ou telefone cadastrado.');
+    if (cleanId.length < 10) {
+      setErrorMsg('Informe seu CPF ou WhatsApp com DDD.');
       return;
     }
-
     if (!loginPassword) {
       setErrorMsg('Informe sua senha.');
       return;
     }
 
-    // Busca vendedora pelo CPF ou telefone
-    const found = resellers.find((r) => {
-      const rCpf = cleanDigits(r.cpf);
-      const rPhone = cleanDigits(r.phone);
-      return (rCpf === cleanId || rPhone === cleanId);
-    });
-
-    if (!found) {
-      const foundLead = leads.find((l) => cleanDigits(l.cpf) === cleanId || cleanDigits(l.phone) === cleanId);
-      if (foundLead) {
+    setIsSubmitting(true);
+    let found: ResellerUser;
+    try {
+      const resp = await entrarVendedora(cleanId, loginPassword);
+      found = resp.vendedora;
+    } catch (err: any) {
+      setIsSubmitting(false);
+      // Ajuda quem só tem pré-cadastro a encontrar o caminho certo
+      const situacao = await verificarCadastroVendedora(cleanId).catch(() => 'nenhum');
+      if (situacao === 'pre_cadastro') {
         setErrorMsg('Encontramos seu pré-cadastro! Clique na aba "Primeiro Acesso / Ativar" para cadastrar sua senha.');
-        return;
+      } else if (situacao === 'nenhum') {
+        setErrorMsg('Cadastro não encontrado com este CPF ou telefone. Se for seu primeiro acesso, clique na aba "Primeiro Acesso".');
+      } else {
+        setErrorMsg(err?.message || 'Não foi possível entrar.');
       }
-      setErrorMsg('Cadastro não encontrado com este CPF ou telefone. Se for seu primeiro acesso, clique na aba "Primeiro Acesso".');
       return;
     }
-
-    // Valida senha (ou senha inicial 123)
-    if (found.password && found.password !== loginPassword && found.password !== '123' && loginPassword !== '123') {
-      setErrorMsg('Senha incorreta. Tente novamente ou use a senha padrão inicial (123).');
-      return;
-    }
+    setIsSubmitting(false);
 
     const updatedUser: ResellerUser = {
       ...found,
@@ -149,7 +147,7 @@ export const ResellerLoginModal: React.FC<ResellerLoginModalProps> = ({
   };
 
   // Submissão do Cadastro / Ativação
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
     setSuccessMsg('');
@@ -168,71 +166,52 @@ export const ResellerLoginModal: React.FC<ResellerLoginModalProps> = ({
       setErrorMsg('Informe um WhatsApp válido com DDD.');
       return;
     }
-    if (!regPassword || regPassword.length < 3) {
-      setErrorMsg('A senha deve ter pelo menos 3 dígitos.');
+    if (!regPassword || regPassword.length < 6) {
+      setErrorMsg('A senha deve ter pelo menos 6 caracteres.');
       return;
     }
 
-    const existing = resellers.find((r) => cleanDigits(r.cpf) === cleanRegCpf);
-    if (existing) {
-      const updated: ResellerUser = {
-        ...existing,
-        fullName: regFullName.trim() || existing.fullName,
-        phone: regPhone || existing.phone,
-        city: regCity.trim() || existing.city,
-        password: regPassword,
-        lastLogin: new Date().toISOString(),
-      };
-      onRegisterReseller(updated);
-      const alreadyAuthorized =
-        hasResellerAuthorizedPush(updated.id, updated.cpf) ||
-        (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted');
-
-      if (alreadyAuthorized) {
-        registerCurrentDeviceForReseller(updated, 'granted');
-        onLoginSuccess(updated);
-        onClose();
-        return;
-      }
-      setPendingUser(updated);
+    setIsSubmitting(true);
+    let user: ResellerUser;
+    try {
+      const resp = await cadastrarVendedora({
+        fullName: regFullName.trim(),
+        cpf: regCpf,
+        phone: regPhone,
+        city: regCity.trim() || 'Itapema / Região - SC',
+      }, regPassword);
+      user = resp.vendedora;
+    } catch (err: any) {
+      setIsSubmitting(false);
+      setErrorMsg(err?.message || 'Não foi possível concluir o cadastro.');
       return;
     }
+    setIsSubmitting(false);
 
-    const newReseller: ResellerUser = {
-      id: `reseller-${Date.now()}`,
-      fullName: regFullName.trim(),
-      cpf: regCpf,
-      phone: regPhone,
-      city: regCity.trim() || 'Itapema / Região - SC',
-      password: regPassword,
-      active: true,
-      createdAt: new Date().toISOString(),
-      lastLogin: new Date().toISOString(),
-    };
+    onRegisterReseller(user);
+    const alreadyAuthorized =
+      hasResellerAuthorizedPush(user.id, user.cpf) ||
+      (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted');
 
-    onRegisterReseller(newReseller);
-    const alreadyAuthorizedNew =
-      typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted';
-
-    if (alreadyAuthorizedNew) {
-      markResellerPushAuthorized(newReseller.id, newReseller.cpf);
-      registerCurrentDeviceForReseller(newReseller, 'granted');
-      onLoginSuccess(newReseller);
+    if (alreadyAuthorized) {
+      markResellerPushAuthorized(user.id, user.cpf);
+      registerCurrentDeviceForReseller(user, 'granted');
+      onLoginSuccess(user);
       onClose();
       return;
     }
-    setPendingUser(newReseller);
+    setPendingUser(user);
   };
 
   // Demonstração rápida
   const handleQuickDemoLogin = () => {
-    const demo = resellers[0] || {
+    const demo: ResellerUser = {
       id: 'reseller-demo',
       fullName: 'Camila Silveira (Demonstração)',
       cpf: '123.456.789-01',
       phone: '(47) 99876-5432',
       city: 'Itapema - SC',
-      password: '123',
+      password: '',
       active: true,
       createdAt: new Date().toISOString(),
       lastLogin: new Date().toISOString(),
@@ -469,21 +448,22 @@ export const ResellerLoginModal: React.FC<ResellerLoginModalProps> = ({
                         type="password"
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
-                        placeholder="Digite sua senha (padrão: 123)"
+                        placeholder="Digite sua senha"
                         className="w-full px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 text-sm bg-slate-50 focus:bg-white transition-all"
                         required
                       />
                     </div>
                     <p className="text-[11px] text-slate-400 mt-1">
-                      * Senha padrão de primeiro acesso: <strong>123</strong>
+                      Ainda não criou sua senha? Use a aba <strong>Primeiro Acesso / Ativar</strong>.
                     </p>
                   </div>
 
                   <button
                     type="submit"
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-rose-200 active:scale-95"
+                    disabled={isSubmitting}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-sm flex items-center justify-center gap-2 transition-all shadow-md shadow-rose-200 active:scale-95 disabled:opacity-60 disabled:cursor-wait"
                   >
-                    <span>Entrar & Vincular Aparelho</span>
+                    <span>{isSubmitting ? 'Conferindo...' : 'Entrar & Vincular Aparelho'}</span>
                     <ArrowRight className="w-4 h-4" />
                   </button>
 
@@ -566,7 +546,7 @@ export const ResellerLoginModal: React.FC<ResellerLoginModalProps> = ({
                       type="password"
                       value={regPassword}
                       onChange={(e) => setRegPassword(e.target.value)}
-                      placeholder="Crie uma senha (mínimo 3 dígitos)"
+                      placeholder="Crie uma senha (mínimo 6 caracteres)"
                       className="w-full px-3.5 py-2 rounded-xl border border-slate-200 focus:outline-none focus:ring-2 focus:ring-rose-500 text-xs bg-slate-50 focus:bg-white transition-all"
                       required
                     />
@@ -574,7 +554,8 @@ export const ResellerLoginModal: React.FC<ResellerLoginModalProps> = ({
 
                   <button
                     type="submit"
-                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-rose-200 active:scale-95"
+                    disabled={isSubmitting}
+                    className="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-rose-600 to-pink-600 hover:from-rose-700 hover:to-pink-700 text-white font-bold text-xs flex items-center justify-center gap-2 transition-all shadow-md shadow-rose-200 active:scale-95 disabled:opacity-60 disabled:cursor-wait"
                   >
                     <UserPlus className="w-4 h-4" />
                     <span>Ativar Cadastro & Vincular Aparelho</span>

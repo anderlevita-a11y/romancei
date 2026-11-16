@@ -465,7 +465,9 @@ export const SALES_PROFILES_COLLECTION = 'sales_profiles';
 export async function saveDeviceToFirestore(device: ResellerDeviceSubscription): Promise<void> {
   try {
     const docRef = doc(db, DEVICES_COLLECTION, device.id);
-    const sanitized = sanitizeForFirestore(device);
+    // Sem CPF/telefone no Firestore (dados pessoais ficam só no Supabase protegido)
+    const { resellerCpf: _cpf, resellerPhone: _tel, ...semDadosPessoais } = device as ResellerDeviceSubscription & { resellerCpf?: string; resellerPhone?: string };
+    const sanitized = sanitizeForFirestore({ ...semDadosPessoais, resellerCpf: '', resellerPhone: '' });
     await setDoc(docRef, sanitized, { merge: true });
   } catch (e) {
     console.warn('Notice saving device to Firestore:', e);
@@ -489,7 +491,14 @@ export async function fetchDevicesFromFirestore(): Promise<ResellerDeviceSubscri
 export async function saveResellerToFirestore(reseller: ResellerUser): Promise<void> {
   try {
     const docRef = doc(db, RESELLERS_COLLECTION, reseller.id);
-    const sanitized = sanitizeForFirestore(reseller);
+    // Só o status do aparelho; CPF, telefone, e-mail e senha NÃO vão para o Firestore
+    const sanitized = sanitizeForFirestore({
+      id: reseller.id,
+      active: reseller.active !== false,
+      deviceAuthorized: reseller.deviceAuthorized ?? true,
+      lastDeviceName: reseller.lastDeviceName || '',
+      updatedAt: new Date().toISOString(),
+    });
     await setDoc(docRef, sanitized, { merge: true });
   } catch (e) {
     console.warn('Notice saving reseller to Firestore:', e);
