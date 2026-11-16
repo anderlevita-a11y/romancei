@@ -38,11 +38,8 @@ Me avise que eu publico. Daqui em diante:
 SQL Editor → cole `seguranca-etapa2.sql` → **Run**.
 A partir daqui o banco só entrega dados privados ao administrador logado.
 
-## Passo 6 — Fechar o Firestore (Firebase)
-**console.firebase.google.com** → projeto → **Firestore → Regras** → cole o conteúdo de `firestore.rules` (na raiz do projeto) → **Publicar**.
-Depois, em **Firestore → Dados**, apague as coleções antigas `leads`, `orders`, `admin_users` e `settings` (o site não usa mais).
-
----
+## Passo 6 — Firebase
+Não é mais necessário: o site não usa mais o Firebase.
 
 ## Como fica para as vendedoras
 - Quem já criou senha própria: entra normalmente.

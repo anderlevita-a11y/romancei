@@ -52,7 +52,6 @@ import {
   hasResellerAuthorizedPush,
   fetchAndSyncAllDevices
 } from '../../utils/webPushHelper';
-import { saveResellerToFirestore } from '../../lib/firebase';
 import { saveResellerUserToSupabase } from '../../lib/supabase';
 
 interface AdminResellerProfilesTabProps {
@@ -138,7 +137,6 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
     if (onUpdateReseller) {
       onUpdateReseller(updatedReseller);
     }
-    saveResellerToFirestore(updatedReseller).catch(() => {});
     saveResellerUserToSupabase(updatedReseller, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
     reloadPushData();
     setSanitizationFeedback(`✅ Aparelho vinculado e Web Push ativado com sucesso para ${reseller.fullName}!`);
@@ -157,7 +155,6 @@ export const AdminResellerProfilesTab: React.FC<AdminResellerProfilesTabProps> =
       if (onUpdateReseller) {
         onUpdateReseller(updated);
       }
-      saveResellerToFirestore(updated).catch(() => {});
       saveResellerUserToSupabase(updated, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
     });
     reloadPushData();

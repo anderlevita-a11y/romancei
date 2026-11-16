@@ -1,7 +1,6 @@
 import { ResellerDeviceSubscription, WebPushLog, PushSanitizationLog, ResellerSalesProfile, ResellerUser } from '../types';
 import { saveResellerDeviceToSupabase, fetchResellerDevicesFromSupabase, saveResellerUserToSupabase } from '../lib/supabase';
 import { tokenVendedora, salvarAparelhoVendedora, atualizarVendedora } from '../lib/seguranca';
-import { saveDeviceToFirestore, fetchDevicesFromFirestore, saveResellerToFirestore } from '../lib/firebase';
 
 const STORAGE_DEVICES_KEY = 'romance_itapema_reseller_devices';
 const STORAGE_LOGS_KEY = 'romance_itapema_web_push_logs';
@@ -408,7 +407,7 @@ export function getStoredDeviceSubscriptions(): ResellerDeviceSubscription[] {
 }
 
 /**
- * Busca de forma unificada os aparelhos da nuvem (Firestore + Supabase) e sincroniza com o localStorage.
+ * Busca de forma unificada os aparelhos da nuvem (Supabase) e sincroniza com o localStorage.
  */
 export async function fetchAndSyncAllDevices(supabaseUrl?: string, supabaseKey?: string): Promise<ResellerDeviceSubscription[]> {
   const localDevs = getStoredDeviceSubscriptions();
@@ -418,19 +417,7 @@ export async function fetchAndSyncAllDevices(supabaseUrl?: string, supabaseKey?:
   });
 
   try {
-    const [firestoreDevs, supabaseDevs] = await Promise.all([
-      fetchDevicesFromFirestore().catch(() => []),
-      fetchResellerDevicesFromSupabase(supabaseUrl, supabaseKey).catch(() => null),
-    ]);
-
-    if (Array.isArray(firestoreDevs)) {
-      firestoreDevs.forEach((d) => {
-        if (d && d.id) {
-          const prev = map.get(d.id);
-          map.set(d.id, { ...prev, ...d });
-        }
-      });
-    }
+    const supabaseDevs = await fetchResellerDevicesFromSupabase(supabaseUrl, supabaseKey).catch(() => null);
 
     if (Array.isArray(supabaseDevs)) {
       supabaseDevs.forEach((d) => {
@@ -480,10 +467,9 @@ export function saveStoredDeviceSubscription(sub: ResellerDeviceSubscription): R
       // silencioso
     }
 
-    // Sincroniza em segundo plano com Supabase e Firestore
+    // Sincroniza em segundo plano com o Supabase
     // Vendedora logada grava pela sessão segura; o admin grava direto na tabela
     (tokenVendedora() ? salvarAparelhoVendedora(sub) : saveResellerDeviceToSupabase(sub)).catch(() => {});
-    saveDeviceToFirestore(sub).catch(() => {});
 
     return updated;
   } catch {
@@ -728,7 +714,6 @@ export function registerCurrentDeviceForReseller(
     reseller.deviceAuthorized = effectivePermission !== 'denied';
     reseller.lastDeviceName = details.deviceName;
     // Persiste também a vendedora com status de aparelho autorizado
-    saveResellerToFirestore(reseller).catch(() => {});
     if (tokenVendedora()) {
       atualizarVendedora({ deviceAuthorized: reseller.deviceAuthorized, lastDeviceName: reseller.lastDeviceName }).catch(() => {});
     } else {
@@ -770,7 +755,7 @@ export function registerCurrentDeviceForReseller(
     receivingStatus: 'active_receiving',
   };
 
-  // Salva no armazenamento local e envia para Supabase e Firestore
+  // Salva no armazenamento local e envia para o Supabase
   saveStoredDeviceSubscription(subscription);
   return subscription;
 }

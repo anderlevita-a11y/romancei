@@ -178,7 +178,7 @@ export function AdminLeadsTab({
                   ? 'bg-rose-50 border-rose-200 text-rose-600 cursor-wait' 
                   : 'bg-emerald-50/80 hover:bg-emerald-100/90 border-emerald-200 text-emerald-800'
               }`}
-              title="Sincronizar dados em tempo real com o banco Firestore"
+              title="Sincronizar dados com o banco Supabase"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-rose-600' : 'text-emerald-600'}`} />
               <span className="hidden sm:inline">{isSyncing ? 'Sincronizando...' : 'Sincronizar'}</span>

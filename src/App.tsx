@@ -37,7 +37,6 @@ import {
   subscribeToSupabaseRealtime,
   fetchAllCloudData
 } from './lib/supabase';
-import { saveResellerToFirestore, fetchDevicesFromFirestore } from './lib/firebase';
 import { sessaoAdmin, adminDaSessao, sairAdmin, aoMudarLoginAdmin, limparCachePrivado, enviarLeadPublico, salvarPerfilVendedora, atualizarVendedora, dadosDaSessaoVendedora, sairVendedora, tokenVendedora } from './lib/seguranca';
 import { getStoredDeviceSubscriptions } from './utils/webPushHelper';
 
@@ -750,19 +749,6 @@ export default function App() {
           }
         }
 
-        // Busca complementar de dispositivos no Firestore
-        fetchDevicesFromFirestore().then((fDevs) => {
-          if (Array.isArray(fDevs) && fDevs.length > 0) {
-            const stored = getStoredDeviceSubscriptions();
-            const devMap = new Map<string, ResellerDeviceSubscription>();
-            stored.forEach((d) => devMap.set(d.id, d));
-            fDevs.forEach((d) => devMap.set(d.id, { ...devMap.get(d.id), ...d }));
-            const mergedDevs = Array.from(devMap.values());
-            if (!isDeepEqual(stored, mergedDevs)) {
-              localStorage.setItem('romance_itapema_reseller_devices', JSON.stringify(mergedDevs));
-            }
-          }
-        }).catch(() => {});
 
         if (cloudData.settings && Object.keys(cloudData.settings).length > 0) {
           setSettings((prev) => {
@@ -1725,7 +1711,6 @@ export default function App() {
         lastDeviceName: updatedReseller.lastDeviceName,
       }).catch(() => {});
     }
-    saveResellerToFirestore(updatedReseller).catch(() => {});
   };
 
   const handleResellerLogout = () => {
