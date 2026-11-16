@@ -7,6 +7,98 @@
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
+-- ---------- Tabelas da vendedora (criadas só se ainda não existirem) ----------
+-- 11. TABELA: reseller_sales_profiles (Perfis de Vendas para Montagem da Sacola pelo Distribuidor)
+-- ==============================================================================
+CREATE TABLE IF NOT EXISTS public.reseller_sales_profiles (
+    id TEXT PRIMARY KEY,
+    reseller_id TEXT NOT NULL,
+    reseller_cpf VARCHAR(20) NOT NULL,
+    reseller_name TEXT NOT NULL,
+    reseller_phone VARCHAR(30) NOT NULL,
+    reseller_city TEXT,
+    
+    -- 1. Cuecas masculinas
+    sells_mens_underwear BOOLEAN DEFAULT false,
+    mens_underwear_sizes JSONB DEFAULT '[]'::jsonb,
+    
+    -- 2. Bermuda e camiseta masculino
+    sells_mens_apparel BOOLEAN DEFAULT false,
+    
+    -- 3. Roupas infantil
+    sells_kids_clothing BOOLEAN DEFAULT false,
+    
+    -- 4. Calcinha e cueca infantil
+    sells_kids_underwear BOOLEAN DEFAULT false,
+    
+    -- 5. Soutien sem bojo
+    sells_bralette_no_padding BOOLEAN DEFAULT false,
+    
+    -- 6. Vende mais tanga ou fio
+    panty_preference VARCHAR(30) DEFAULT 'equilibrado',
+    
+    -- 7. Vende mais P, M, G ou GG
+    top_selling_sizes JSONB DEFAULT '["M", "G"]'::jsonb,
+    
+    -- 8. Roupas em geral (13 itens oficiais)
+    general_clothing_items JSONB DEFAULT '[]'::jsonb,
+    
+    -- 9. Recado salvo para o distribuidor
+    distributor_message TEXT DEFAULT '',
+
+    -- 10. Data de Retorno do Atendimento e Notificação Web Push Automática
+    return_date DATE,
+    return_time VARCHAR(10) DEFAULT '10:00',
+    return_notes TEXT DEFAULT '',
+    push_scheduled BOOLEAN DEFAULT true,
+    push_notification_title TEXT DEFAULT 'Romance Itapema: Retorno do Mostruário',
+    push_notification_body TEXT DEFAULT '',
+    push_sent_at TIMESTAMPTZ,
+    push_status VARCHAR(30) DEFAULT 'agendado',
+    
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Migração segura caso a tabela já exista:
+ALTER TABLE public.reseller_sales_profiles ADD COLUMN IF NOT EXISTS return_date DATE;
+ALTER TABLE public.reseller_sales_profiles ADD COLUMN IF NOT EXISTS return_time VARCHAR(10) DEFAULT '10:00';
+ALTER TABLE public.reseller_sales_profiles ADD COLUMN IF NOT EXISTS return_notes TEXT DEFAULT '';
+ALTER TABLE public.reseller_sales_profiles ADD COLUMN IF NOT EXISTS push_scheduled BOOLEAN DEFAULT true;
+ALTER TABLE public.reseller_sales_profiles ADD COLUMN IF NOT EXISTS push_notification_title TEXT DEFAULT 'Romance Itapema: Retorno do Mostruário';
+ALTER TABLE public.reseller_sales_profiles ADD COLUMN IF NOT EXISTS push_notification_body TEXT DEFAULT '';
+ALTER TABLE public.reseller_sales_profiles ADD COLUMN IF NOT EXISTS push_sent_at TIMESTAMPTZ;
+ALTER TABLE public.reseller_sales_profiles ADD COLUMN IF NOT EXISTS push_status VARCHAR(30) DEFAULT 'agendado';
+
+CREATE INDEX IF NOT EXISTS idx_sales_profiles_cpf ON public.reseller_sales_profiles(reseller_cpf);
+CREATE INDEX IF NOT EXISTS idx_sales_profiles_reseller_id ON public.reseller_sales_profiles(reseller_id);
+CREATE INDEX IF NOT EXISTS idx_sales_profiles_return_date ON public.reseller_sales_profiles(return_date);
+CREATE INDEX IF NOT EXISTS idx_sales_profiles_updated_at ON public.reseller_sales_profiles(updated_at DESC);
+
+-- 10. TABELA: reseller_devices (Aparelhos vinculados e autorização de Web Push)
+CREATE TABLE IF NOT EXISTS public.reseller_devices (
+    id TEXT PRIMARY KEY,
+    reseller_id TEXT NOT NULL,
+    reseller_name TEXT NOT NULL,
+    reseller_cpf VARCHAR(20) NOT NULL,
+    reseller_phone VARCHAR(30),
+    device_name TEXT NOT NULL,
+    device_model TEXT,
+    device_type VARCHAR(20) DEFAULT 'mobile',
+    browser TEXT,
+    os TEXT,
+    permission_status VARCHAR(20) DEFAULT 'granted',
+    push_token TEXT,
+    user_agent TEXT,
+    registered_at TIMESTAMPTZ DEFAULT NOW(),
+    last_active_at TIMESTAMPTZ DEFAULT NOW(),
+    active BOOLEAN DEFAULT true
+);
+
+CREATE INDEX IF NOT EXISTS idx_reseller_devices_reseller_id ON public.reseller_devices(reseller_id);
+CREATE INDEX IF NOT EXISTS idx_reseller_devices_cpf ON public.reseller_devices(reseller_cpf);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.reseller_sales_profiles, public.reseller_devices TO authenticated;
+
 -- colunas usadas pelas funções (já existem na maioria das instalações)
 ALTER TABLE public.leads ADD COLUMN IF NOT EXISTS referral_coupon_code VARCHAR(50);
 
