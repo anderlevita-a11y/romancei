@@ -178,13 +178,21 @@ END $$;
 -- FUNÇÕES PÚBLICAS (usadas pelo site sem login)
 -- ==============================================================================
 
+-- Telefone do lead: alguns bancos usam a coluna "phone", outros "whatsapp"
+CREATE OR REPLACE FUNCTION public._tel_lead(l public.leads) RETURNS text
+LANGUAGE sql STABLE SET search_path = public AS $$
+  SELECT COALESCE(NULLIF(to_jsonb(l)->>'phone', ''), to_jsonb(l)->>'whatsapp');
+$$;
+
 -- Pré-cadastro: grava o lead SEM poder ler os outros
 CREATE OR REPLACE FUNCTION public.submit_lead(p jsonb) RETURNS text
 LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
-DECLARE r public.leads;
+DECLARE r public.leads; tel text := COALESCE(NULLIF(p->>'phone',''), p->>'whatsapp');
 BEGIN
+  -- grava o telefone na coluna que existir (phone ou whatsapp)
+  p := p || jsonb_build_object('phone', tel, 'whatsapp', tel);
   r := jsonb_populate_record(NULL::public.leads, p);
-  IF r.id IS NULL OR r.full_name IS NULL OR r.cpf IS NULL OR r.phone IS NULL THEN
+  IF r.id IS NULL OR r.full_name IS NULL OR r.cpf IS NULL OR tel IS NULL THEN
     RAISE EXCEPTION 'dados_incompletos';
   END IF;
   r.status := 'novo';
@@ -250,7 +258,7 @@ DECLARE d text := public._digitos(p_id);
 BEGIN
   IF length(d) < 10 THEN RETURN 'nenhum'; END IF;
   IF EXISTS (SELECT 1 FROM public.reseller_users WHERE public._digitos(cpf) = d OR public._digitos(phone) = d) THEN RETURN 'vendedora'; END IF;
-  IF EXISTS (SELECT 1 FROM public.leads WHERE public._digitos(cpf) = d OR public._digitos(phone) = d) THEN RETURN 'pre_cadastro'; END IF;
+  IF EXISTS (SELECT 1 FROM public.leads l WHERE public._digitos(l.cpf) = d OR public._digitos(public._tel_lead(l)) = d) THEN RETURN 'pre_cadastro'; END IF;
   RETURN 'nenhum';
 END $$;
 
@@ -312,8 +320,8 @@ BEGIN
      WHERE id = r.id RETURNING * INTO r;
   ELSE
     IF EXISTS (SELECT 1 FROM public.leads WHERE public._digitos(cpf) = public._digitos(novo.cpf))
-       AND NOT EXISTS (SELECT 1 FROM public.leads WHERE public._digitos(cpf) = public._digitos(novo.cpf)
-                                                   AND public._digitos(phone) = public._digitos(novo.phone)) THEN
+       AND NOT EXISTS (SELECT 1 FROM public.leads l WHERE public._digitos(l.cpf) = public._digitos(novo.cpf)
+                                                   AND public._digitos(public._tel_lead(l)) = public._digitos(novo.phone)) THEN
       PERFORM pg_sleep(0.5);
       RAISE EXCEPTION 'telefone_nao_confere';
     END IF;
