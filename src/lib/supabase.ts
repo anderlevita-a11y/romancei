@@ -520,7 +520,7 @@ export const syncSettingsToSupabase = async (settings: BusinessSettings, customU
       loja_florianopolis_vendedora: settings.lojaFlorianopolisVendedora,
       loja_florianopolis_whatsapp: settings.lojaFlorianopolisWhatsApp,
       loja_florianopolis_display_whatsapp: settings.lojaFlorianopolisDisplayWhatsApp,
-      admin_pin: settings.adminPin,
+      admin_pin: null, // o PIN não vai mais para o banco (a tabela de configurações é pública)
       hero_banner_url: settings.heroBannerUrl || null,
       logo_url: settings.logoUrl || null,
       welcome_template: settings.welcomeTemplate,
@@ -605,7 +605,7 @@ export const syncAdminUserToSupabase = async (user: AdminUser, customUrl?: strin
       name: user.name,
       email: user.email.toLowerCase().trim(),
       role: user.role,
-      password: user.password,
+      password: '', // o login do admin agora é pelo Supabase Auth: nenhuma senha fica nesta tabela
       phone: user.phone || null,
       created_at: user.createdAt || new Date().toISOString(),
       is_default_test: Boolean(user.isDefaultTest),
@@ -1209,7 +1209,7 @@ export const mapResellerUserFromSupabase = (row: any): ResellerUser => ({
   cpf: row.cpf || '',
   phone: row.phone || '',
   email: row.email || '',
-  password: row.password || '123',
+  password: '',
   city: row.city || '',
   leadId: row.lead_id || undefined,
   active: row.active !== false,
@@ -1225,7 +1225,6 @@ export const mapResellerUserToSupabase = (user: ResellerUser) => ({
   cpf: user.cpf,
   phone: user.phone,
   email: user.email || '',
-  password: user.password || '123',
   city: user.city || '',
   lead_id: user.leadId || null,
   active: user.active !== false,
@@ -1435,6 +1434,12 @@ export interface RealtimeSubscriptionHandlers {
  * Busca consolidada de todos os dados do banco de dados na nuvem (Supabase)
  */
 export const fetchAllCloudData = async (customUrl?: string, customKey?: string) => {
+  // Dados privados (pré-cadastros, sacolas, cupons, usuários, vendedoras) só para o admin logado.
+  // O visitante recebe apenas o conteúdo público do site.
+  const { eAdmin } = await import('./seguranca');
+  const admin = await eAdmin().catch(() => false);
+  const privado = <T,>(fn: () => Promise<T>): Promise<T | null> => (admin ? fn() : Promise.resolve(null));
+
   const [
     cloudLeads, 
     cloudOrders, 
@@ -1448,17 +1453,17 @@ export const fetchAllCloudData = async (customUrl?: string, customKey?: string) 
     cloudSalesProfiles,
     cloudDevices
   ] = await Promise.all([
-    fetchLeadsFromSupabase(customUrl, customKey),
-    fetchOrdersFromSupabase(customUrl, customKey),
-    fetchReferralCouponsFromSupabase(customUrl, customKey),
-    fetchAdminUsersFromSupabase(customUrl, customKey),
+    privado(() => fetchLeadsFromSupabase(customUrl, customKey)),
+    privado(() => fetchOrdersFromSupabase(customUrl, customKey)),
+    privado(() => fetchReferralCouponsFromSupabase(customUrl, customKey)),
+    privado(() => fetchAdminUsersFromSupabase(customUrl, customKey)),
     fetchSettingsFromSupabase(customUrl, customKey),
     fetchMediaItemsFromSupabase(customUrl, customKey),
     fetchTestimonialsFromSupabase(customUrl, customKey),
     fetchCommercialLinesFromSupabase(customUrl, customKey),
-    fetchResellerUsersFromSupabase(customUrl, customKey),
-    fetchSalesProfilesFromSupabase(customUrl, customKey),
-    fetchResellerDevicesFromSupabase(customUrl, customKey),
+    privado(() => fetchResellerUsersFromSupabase(customUrl, customKey)),
+    privado(() => fetchSalesProfilesFromSupabase(customUrl, customKey)),
+    privado(() => fetchResellerDevicesFromSupabase(customUrl, customKey)),
   ]);
 
   return {

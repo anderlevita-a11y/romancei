@@ -38,6 +38,7 @@ import {
   fetchAllCloudData
 } from './lib/supabase';
 import { saveResellerToFirestore, fetchDevicesFromFirestore } from './lib/firebase';
+import { sessaoAdmin, adminDaSessao, sairAdmin, aoMudarLoginAdmin, limparCachePrivado, enviarLeadPublico, salvarPerfilVendedora, atualizarVendedora, dadosDaSessaoVendedora, sairVendedora, tokenVendedora } from './lib/seguranca';
 import { getStoredDeviceSubscriptions } from './utils/webPushHelper';
 
 // Public Components
@@ -491,16 +492,18 @@ export default function App() {
 
   // Reseller and Sales Profile LocalStorage Sync
   useEffect(() => {
+    if (!isAdminAuthenticated) return;
     try {
       localStorage.setItem('romance_itapema_resellers', JSON.stringify(resellers));
     } catch {}
-  }, [resellers]);
+  }, [resellers, isAdminAuthenticated]);
 
   useEffect(() => {
+    if (!isAdminAuthenticated) return;
     try {
       localStorage.setItem('romance_itapema_sales_profiles', JSON.stringify(salesProfiles));
     } catch {}
-  }, [salesProfiles]);
+  }, [salesProfiles, isAdminAuthenticated]);
 
   useEffect(() => {
     try {
@@ -949,12 +952,14 @@ export default function App() {
 
   // Sync to LocalStorage (Instant local persistence)
   useEffect(() => {
+    if (!isAdminAuthenticated) return;
     localStorage.setItem('romance_itapema_leads', JSON.stringify(leads));
-  }, [leads]);
+  }, [leads, isAdminAuthenticated]);
 
   useEffect(() => {
+    if (!isAdminAuthenticated) return;
     localStorage.setItem('romance_itapema_orders', JSON.stringify(orders));
-  }, [orders]);
+  }, [orders, isAdminAuthenticated]);
 
   useEffect(() => {
     localStorage.setItem('romance_itapema_media_items', JSON.stringify(mediaItems));
@@ -969,16 +974,18 @@ export default function App() {
   }, [settings]);
 
   useEffect(() => {
+    if (!isAdminAuthenticated) return;
     localStorage.setItem('romance_itapema_admin_users', JSON.stringify(adminUsers));
-  }, [adminUsers]);
+  }, [adminUsers, isAdminAuthenticated]);
 
   useEffect(() => {
     localStorage.setItem('romance_itapema_commercial_lines', JSON.stringify(commercialLines));
   }, [commercialLines]);
 
   useEffect(() => {
+    if (!isAdminAuthenticated) return;
     localStorage.setItem('romance_itapema_coupons', JSON.stringify(coupons));
-  }, [coupons]);
+  }, [coupons, isAdminAuthenticated]);
 
   // Coupon Actions
   const handleSaveCoupon = (coupon: ReferralCoupon) => {
@@ -991,9 +998,11 @@ export default function App() {
       return [coupon, ...prev];
     });
 
-    syncReferralCouponToSupabase(coupon, settings.supabaseUrl, settings.supabaseAnonKey).catch((err) => {
-      console.warn('Supabase coupon sync notice:', err);
-    });
+    if (isAdminAuthenticated) {
+      syncReferralCouponToSupabase(coupon, settings.supabaseUrl, settings.supabaseAnonKey).catch((err) => {
+        console.warn('Supabase coupon sync notice:', err);
+      });
+    }
   };
 
   const handleDeleteCoupon = (couponId: string) => {
@@ -1007,9 +1016,13 @@ export default function App() {
   const handleAddLead = (newLead: Lead) => {
     setLeads((prev) => [newLead, ...prev]);
     // Asynchronously sync to Supabase
-    syncLeadToSupabase(newLead, settings.supabaseUrl, settings.supabaseAnonKey).catch((err) => {
-      console.warn('Supabase lead sync notice:', err);
-    });
+    if (isAdminAuthenticated) {
+      syncLeadToSupabase(newLead, settings.supabaseUrl, settings.supabaseAnonKey).catch((err) => {
+        console.warn('Supabase lead sync notice:', err);
+      });
+    } else {
+      enviarLeadPublico(newLead).catch((err) => console.warn('Envio do pré-cadastro:', err));
+    }
     triggerLeadNotification(newLead, 'form_submission');
   };
 
@@ -1549,13 +1562,82 @@ export default function App() {
     setIsAdminAuthenticated(true);
     setIsLoginModalOpen(false);
     setIsAdminView(true);
+    // carrega os dados privados agora que a sessão de admin existe
+    setTimeout(() => { handleForceRefreshAll(); }, 0);
+  };
+
+  const limparDadosPrivadosDaTela = () => {
+    limparCachePrivado();
+    setLeads([]);
+    setOrders([]);
+    setCoupons([]);
+    setAdminUsers([]);
+    setResellers([]);
+    setSalesProfiles([]);
   };
 
   const handleLogout = () => {
     setIsAdminAuthenticated(false);
     setCurrentAdminUser(null);
     setIsAdminView(false);
+    sairAdmin().catch(() => {});
+    limparDadosPrivadosDaTela();
   };
+
+  // Sessão do administrador (Supabase Auth): restaura ao abrir e reage a login/logout
+  useEffect(() => {
+    let ativo = true;
+    const verificar = async () => {
+      const s = await sessaoAdmin().catch(() => null);
+      if (!ativo) return;
+      if (s) {
+        setIsAdminAuthenticated(true);
+        setCurrentAdminUser((u) => u || adminDaSessao(s));
+      } else {
+        setIsAdminAuthenticated(false);
+        setCurrentAdminUser(null);
+        setIsAdminView(false);
+        // visitante: remove dados privados que versões antigas guardavam no navegador
+        limparCachePrivado();
+        setLeads([]);
+        setOrders([]);
+        setCoupons([]);
+        setAdminUsers([]);
+        setResellers((prev) => (currentReseller ? prev.filter((r) => r.id === currentReseller.id) : []));
+        setSalesProfiles((prev) => (currentReseller ? prev.filter((p) => p.resellerId === currentReseller.id) : []));
+      }
+    };
+    verificar();
+    const parar = aoMudarLoginAdmin(verificar);
+    return () => { ativo = false; parar(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Sessão da vendedora: confere o token no servidor e carrega o perfil dela
+  useEffect(() => {
+    if (!currentReseller || currentReseller.id === 'reseller-demo') return;
+    if (!tokenVendedora()) {
+      setCurrentReseller(null);
+      setIsResellerDashboardView(false);
+      return;
+    }
+    let ativo = true;
+    dadosDaSessaoVendedora().then((r) => {
+      if (!ativo) return;
+      if (!r) {
+        setCurrentReseller(null);
+        setIsResellerDashboardView(false);
+        return;
+      }
+      setCurrentReseller((atual) => (atual && atual.id === r.vendedora.id ? { ...atual, ...r.vendedora } : r.vendedora));
+      if (r.perfil) {
+        const perfil = r.perfil;
+        setSalesProfiles((prev) => [perfil, ...prev.filter((p) => p.id !== perfil.id && p.resellerId !== perfil.resellerId)]);
+      }
+    }).catch(() => {});
+    return () => { ativo = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentReseller?.id]);
 
   // Reseller Portal Handlers
   const handleOpenResellerPortal = () => {
@@ -1579,7 +1661,6 @@ export default function App() {
       }
       return [reseller, ...prev];
     });
-    saveResellerUserToSupabase(reseller, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
   };
 
   const handleResellerRegister = (newReseller: ResellerUser) => {
@@ -1590,7 +1671,6 @@ export default function App() {
     setCurrentReseller(newReseller);
     setIsResellerLoginModalOpen(false);
     setIsResellerDashboardView(true);
-    saveResellerUserToSupabase(newReseller, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
   };
 
   const handleSaveSalesProfile = (profile: ResellerSalesProfile) => {
@@ -1612,7 +1692,11 @@ export default function App() {
       )
     );
 
-    saveSalesProfileToSupabase(profile, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
+    if (isAdminAuthenticated && !isResellerDashboardView) {
+      saveSalesProfileToSupabase(profile, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
+    } else {
+      salvarPerfilVendedora(profile).catch(() => {});
+    }
   };
 
   const handleUpdateReseller = (updatedReseller: ResellerUser) => {
@@ -1630,13 +1714,24 @@ export default function App() {
     if (currentReseller && (currentReseller.id === updatedReseller.id || currentReseller.cpf === updatedReseller.cpf)) {
       setCurrentReseller(updatedReseller);
     }
-    saveResellerUserToSupabase(updatedReseller, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
+    if (isAdminAuthenticated && !isResellerDashboardView) {
+      saveResellerUserToSupabase(updatedReseller, settings.supabaseUrl, settings.supabaseAnonKey).catch(() => {});
+    } else {
+      atualizarVendedora({
+        phone: updatedReseller.phone,
+        email: updatedReseller.email,
+        city: updatedReseller.city,
+        deviceAuthorized: updatedReseller.deviceAuthorized,
+        lastDeviceName: updatedReseller.lastDeviceName,
+      }).catch(() => {});
+    }
     saveResellerToFirestore(updatedReseller).catch(() => {});
   };
 
   const handleResellerLogout = () => {
     setCurrentReseller(null);
     setIsResellerDashboardView(false);
+    sairVendedora().catch(() => {});
   };
 
   // Render Admin View if active

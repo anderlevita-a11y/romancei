@@ -1,5 +1,6 @@
 import { ResellerDeviceSubscription, WebPushLog, PushSanitizationLog, ResellerSalesProfile, ResellerUser } from '../types';
 import { saveResellerDeviceToSupabase, fetchResellerDevicesFromSupabase, saveResellerUserToSupabase } from '../lib/supabase';
+import { tokenVendedora, salvarAparelhoVendedora, atualizarVendedora } from '../lib/seguranca';
 import { saveDeviceToFirestore, fetchDevicesFromFirestore, saveResellerToFirestore } from '../lib/firebase';
 
 const STORAGE_DEVICES_KEY = 'romance_itapema_reseller_devices';
@@ -480,7 +481,8 @@ export function saveStoredDeviceSubscription(sub: ResellerDeviceSubscription): R
     }
 
     // Sincroniza em segundo plano com Supabase e Firestore
-    saveResellerDeviceToSupabase(sub).catch(() => {});
+    // Vendedora logada grava pela sessão segura; o admin grava direto na tabela
+    (tokenVendedora() ? salvarAparelhoVendedora(sub) : saveResellerDeviceToSupabase(sub)).catch(() => {});
     saveDeviceToFirestore(sub).catch(() => {});
 
     return updated;
@@ -727,7 +729,11 @@ export function registerCurrentDeviceForReseller(
     reseller.lastDeviceName = details.deviceName;
     // Persiste também a vendedora com status de aparelho autorizado
     saveResellerToFirestore(reseller).catch(() => {});
-    saveResellerUserToSupabase(reseller).catch(() => {});
+    if (tokenVendedora()) {
+      atualizarVendedora({ deviceAuthorized: reseller.deviceAuthorized, lastDeviceName: reseller.lastDeviceName }).catch(() => {});
+    } else {
+      saveResellerUserToSupabase(reseller).catch(() => {});
+    }
   }
 
   // Token válido por padrão por 60 dias

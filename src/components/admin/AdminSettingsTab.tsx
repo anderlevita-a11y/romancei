@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { BusinessSettings, AdminUser } from '../../types';
 import { formatMediaUrl } from '../../utils/mediaUrlHelper';
+import { getSupabaseClient } from '../../lib/supabase';
 import heroBannerAsset from '../../assets/images/hero_distribuidor_banner_1787665220498.jpg';
 import {
   isWebAuthnSupported,
@@ -590,12 +591,12 @@ CREATE POLICY "Upload livre para buckets de mídia" ON storage.objects
     }
   };
 
-  const handleQuickPasswordChange = (e: React.FormEvent) => {
+  const handleQuickPasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
     setQuickPassMsg(null);
 
-    if (!quickPassword || quickPassword.length < 3) {
-      setQuickPassMsg({ type: 'error', text: 'A nova senha deve ter no mínimo 3 caracteres.' });
+    if (!quickPassword || quickPassword.length < 8) {
+      setQuickPassMsg({ type: 'error', text: 'A nova senha deve ter no mínimo 8 caracteres.' });
       return;
     }
 
@@ -604,26 +605,21 @@ CREATE POLICY "Upload livre para buckets de mídia" ON storage.objects
       return;
     }
 
-    // Target the current logged in user, or master user
-    const targetUser = currentAdminUser || adminUsers.find(u => u.role === 'distribuidor') || adminUsers[0];
-    if (targetUser && onSaveAdminUser) {
-      const updatedUser: AdminUser = {
-        ...targetUser,
-        password: quickPassword.trim(),
-        isDefaultTest: false,
-      };
-      onSaveAdminUser(updatedUser);
-
-      // Also update admin pin if preferred
-      const newSettings = { ...formData, adminPin: quickPassword.trim() };
-      setFormData(newSettings);
-      onUpdateSettings(newSettings);
-
-      setQuickPassMsg({ type: 'success', text: `Senha do administrador (${updatedUser.name}) alterada com sucesso!` });
-      setQuickPassword('');
-      setQuickPasswordConfirm('');
-      setTimeout(() => setQuickPassMsg(null), 5000);
+    // A senha do admin agora é a do login no Supabase (nunca fica salva nas configurações do site)
+    const client = getSupabaseClient();
+    if (!client) {
+      setQuickPassMsg({ type: 'error', text: 'Banco de dados não configurado.' });
+      return;
     }
+    const { error } = await client.auth.updateUser({ password: quickPassword });
+    if (error) {
+      setQuickPassMsg({ type: 'error', text: `Não foi possível trocar a senha: ${error.message}` });
+      return;
+    }
+    setQuickPassMsg({ type: 'success', text: 'Senha de acesso ao painel alterada com sucesso!' });
+    setQuickPassword('');
+    setQuickPasswordConfirm('');
+    setTimeout(() => setQuickPassMsg(null), 5000);
   };
 
   const handleOpenAddUser = () => {
@@ -770,7 +766,7 @@ CREATE POLICY "Upload livre para buckets de mídia" ON storage.objects
             <div className="flex items-center justify-between">
               <h4 className="font-bold text-rose-900 text-xs flex items-center gap-1.5">
                 <Edit2 className="w-3.5 h-3.5 text-rose-600" />
-                <span>{editingUserId ? 'Editar Administrador / Alterar Senha' : 'Cadastrar Novo Administrador'}</span>
+                <span>{editingUserId ? 'Editar Administrador' : 'Cadastrar Novo Administrador'}</span>
               </h4>
               <button
                 type="button"

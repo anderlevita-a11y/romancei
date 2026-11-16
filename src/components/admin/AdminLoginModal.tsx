@@ -18,6 +18,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { BusinessSettings, AdminUser } from '../../types';
+import { entrarAdmin, sessaoAdmin, adminDaSessao } from '../../lib/seguranca';
 import {
   isWebAuthnSupported,
   isPlatformAuthenticatorAvailable,
@@ -48,6 +49,7 @@ export function AdminLoginModal({
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [loginError, setLoginError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [rememberBiometricOnLogin, setRememberBiometricOnLogin] = useState(false);
 
   // WebAuthn state
@@ -106,7 +108,7 @@ export function AdminLoginModal({
         name: settings.distributorName || 'Anderson Rodrigues',
         email: cleanId.includes('@') ? cleanId : 'admin@romanceitapema.com.br',
         role: 'distribuidor',
-        password: pass || settings.adminPin || 'romance2026',
+        password: '',
         createdAt: new Date().toISOString(),
         isDefaultTest: true
       };
@@ -117,7 +119,7 @@ export function AdminLoginModal({
       name: settings.distributorName || 'Anderson Rodrigues',
       email: cleanId.includes('@') ? cleanId : `${cleanId}@romanceitapema.com.br`,
       role: 'distribuidor',
-      password: pass || settings.adminPin || 'romance2026',
+      password: '',
       createdAt: new Date().toISOString()
     };
   };
@@ -143,8 +145,17 @@ export function AdminLoginModal({
           message: 'Biometria validada com sucesso! Conectando ao painel...',
         });
 
-        const targetEmail = result.userEmail || configToUse.userEmail || loginIdentifier || 'admin@romanceitapema.com.br';
-        const user = resolveUser(targetEmail);
+        // A biometria só desbloqueia uma sessão de administrador que já existe neste aparelho
+        const sessao = await sessaoAdmin();
+        if (!sessao) {
+          setIsBioLoading(false);
+          setBioNotice({
+            type: 'info',
+            message: 'Por segurança, entre uma vez com e-mail e senha. Depois a biometria desbloqueia o painel neste aparelho.',
+          });
+          return;
+        }
+        const user = adminDaSessao(sessao);
 
         setTimeout(() => {
           setIsBioLoading(false);
@@ -296,46 +307,19 @@ export function AdminLoginModal({
       return;
     }
 
-    // 1. Check against registered admin users
-    const matchedUser = adminUsers.find((u) => {
-      const emailMatch = u.email.toLowerCase() === identifier;
-      const nameMatch = u.name.toLowerCase().includes(identifier);
-      return (emailMatch || nameMatch) && (u.password === password || password === settings.adminPin || password === 'admin' || password === 'romance2026');
-    });
-
-    let authenticatedUser: AdminUser | null = matchedUser || null;
-
-    // 2. Check fallback master credentials
-    if (!authenticatedUser) {
-      if (
-        (identifier === 'admin' || identifier === 'admin@romancemodasitajai.com.br' || identifier === 'admin@romancemodaitajai.com.br' || identifier === 'admin@romanceitapema.com.br' || identifier === 'teste@romance.com.br' || identifier === 'jeferson' || identifier === 'anderson') &&
-        (password === 'admin' || password === 'romance2026' || password === settings.adminPin)
-      ) {
-        authenticatedUser = {
-          id: 'admin-master',
-          name: settings.distributorName || 'Anderson Rodrigues',
-          email: identifier.includes('@') ? identifier : 'admin@romanceitapema.com.br',
-          role: 'distribuidor',
-          password: password,
-          createdAt: new Date().toISOString(),
-          isDefaultTest: true
-        };
-      }
+    if (!identifier.includes('@')) {
+      setLoginError('Entre com o seu e-mail de administrador.');
+      return;
     }
 
-    // 3. Fallback check by PIN
-    if (!authenticatedUser) {
-      if (password === settings.adminPin || password === 'romance2026' || password === 'admin') {
-        authenticatedUser = adminUsers[0] || {
-          id: 'admin-fallback',
-          name: settings.distributorName || 'Anderson Rodrigues',
-          email: identifier.includes('@') ? identifier : `${identifier}@romanceitapema.com.br`,
-          role: 'distribuidor',
-          password: password,
-          createdAt: new Date().toISOString()
-        };
-      }
+    setIsSubmitting(true);
+    const resultado = await entrarAdmin(identifier, password);
+    setIsSubmitting(false);
+    if (resultado.ok === false) {
+      setLoginError(resultado.erro);
+      return;
     }
+    const authenticatedUser: AdminUser | null = resultado.usuario;
 
     if (authenticatedUser) {
       // If user selected "Remember biometric" or autoBioLogin, link biometric credential
@@ -356,7 +340,6 @@ export function AdminLoginModal({
       return;
     }
 
-    setLoginError('E-mail ou senha incorretos. Verifique suas credenciais de acesso.');
   };
 
   return (
@@ -610,9 +593,10 @@ export function AdminLoginModal({
           {/* Login CTA */}
           <button
             type="submit"
-            className="w-full bg-gradient-to-r from-rose-600 via-rose-700 to-rose-800 hover:from-rose-700 hover:to-rose-900 text-white font-bold text-sm py-3 sm:py-3.5 px-4 rounded-xl shadow-lg shadow-rose-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 active:scale-[0.98]"
+            disabled={isSubmitting}
+            className="w-full bg-gradient-to-r from-rose-600 via-rose-700 to-rose-800 hover:from-rose-700 hover:to-rose-900 text-white font-bold text-sm py-3 sm:py-3.5 px-4 rounded-xl shadow-lg shadow-rose-600/25 transition-all flex items-center justify-center gap-2 cursor-pointer mt-2 active:scale-[0.98] disabled:opacity-60 disabled:cursor-wait"
           >
-            <span>Entrar com Senha</span>
+            <span>{isSubmitting ? 'Entrando...' : 'Entrar com Senha'}</span>
             <ArrowRight className="w-4 h-4" />
           </button>
         </form>
