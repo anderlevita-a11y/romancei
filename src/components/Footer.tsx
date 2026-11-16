@@ -1,4 +1,4 @@
-import { Sparkles, Heart, Shield, Lock, MapPin, Phone, MessageCircle, Instagram, Gift, ExternalLink, Share2, UserCheck } from 'lucide-react';
+import { Sparkles, Heart, Shield, Lock, MapPin, Phone, MessageCircle, Instagram, Gift, ExternalLink, Share2, UserCheck, Bot } from 'lucide-react';
 import { BusinessSettings } from '../types';
 import { buildWhatsAppLink, buildInstagramLink } from '../utils/validators';
 
@@ -232,6 +232,13 @@ export function Footer({ settings, onOpenAdmin, onOpenLgpd, onScrollToForm, onOp
                   <Lock className="w-3.5 h-3.5 text-stone-400" />
                   <span>Painel da Distribuidora (Admin)</span>
                 </button>
+                <a
+                  href="/automacao.html"
+                  className="w-full bg-gradient-to-r from-rose-600 to-rose-800 hover:from-rose-500 hover:to-rose-700 text-white p-3 rounded-2xl border border-rose-400/30 flex items-center justify-center gap-2 transition-all shadow-xs font-semibold"
+                >
+                  <Bot className="w-3.5 h-3.5" />
+                  <span>Formulário para Automação</span>
+                </a>
               </li>
             </ul>
           </div>
