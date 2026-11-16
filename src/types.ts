@@ -161,7 +161,7 @@ export interface CommercialLine {
   createdAt?: string;
 }
 
-export type AdminTabType = 'leads' | 'orders' | 'vendedoras' | 'referrals' | 'lines' | 'media' | 'testimonials' | 'metrics' | 'settings';
+export type AdminTabType = 'leads' | 'automacao' | 'orders' | 'vendedoras' | 'referrals' | 'lines' | 'media' | 'testimonials' | 'metrics' | 'settings';
 
 export interface ReferralCoupon {
   id: string;

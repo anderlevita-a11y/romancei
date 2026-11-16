@@ -25,7 +25,8 @@ import {
   Volume2,
   VolumeX,
   Gift,
-  UserCheck
+  UserCheck,
+  Bot
 } from 'lucide-react';
 import { Lead, ConsignmentOrder, BusinessSettings, LeadStatus, AdminUser, MediaItem, AdminTabType, TestimonialItem, TestimonialStatus, CommercialLine, RealtimeLeadNotification, ReferralCoupon, ResellerUser, ResellerSalesProfile } from '../../types';
 import { AdminLeadsTab } from './AdminLeadsTab';
@@ -37,6 +38,7 @@ import { AdminMediaTab } from './AdminMediaTab';
 import { AdminTestimonialsTab } from './AdminTestimonialsTab';
 import { AdminMetricsTab } from './AdminMetricsTab';
 import { AdminSettingsTab } from './AdminSettingsTab';
+import { AdminAutomacaoTab } from './AdminAutomacaoTab';
 import { AdminLeadDetailModal } from './AdminLeadDetailModal';
 import { AdminNewLeadModal } from './AdminNewLeadModal';
 import { AdminNewOrderModal } from './AdminNewOrderModal';
@@ -280,6 +282,7 @@ export function AdminDashboard({
     { id: 'lines' as const, label: 'Linhas Comerciais', icon: Layers, badge: activeCommercialLinesCount },
     { id: 'testimonials' as const, label: 'Depoimentos', icon: MessageSquareHeart, badge: pendingTestimonialsCount },
     { id: 'media' as const, label: 'Fotos & Vídeos', icon: Film, badge: totalActiveMedia },
+    { id: 'automacao' as const, label: 'Automação', icon: Bot },
     { id: 'metrics' as const, label: 'Métricas', icon: BarChart3 },
     { id: 'settings' as const, label: 'Configurações', icon: Settings },
   ];
@@ -638,6 +641,8 @@ export function AdminDashboard({
             onSyncWithSupabase={onSyncMediaWithSupabase}
           />
         )}
+
+        {activeTab === 'automacao' && <AdminAutomacaoTab />}
 
         {activeTab === 'metrics' && (
           <AdminMetricsTab

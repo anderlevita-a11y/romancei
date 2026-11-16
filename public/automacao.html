@@ -170,13 +170,65 @@
       box.classList.toggle('oculto', !on); outro.required = on;
     });
   });
-  // valida telefones (10 ou 11 dígitos)
-  document.getElementById('f').addEventListener('submit', function (e) {
+  // ===== Envio: grava no painel do distribuidor (Supabase) + cópia no Netlify Forms =====
+  var SUPABASE_URL = 'https://bminunltftkmfmsnjpea.supabase.co';
+  var SUPABASE_KEY = 'sb_publishable_R0re_YsLe2GIIuB-bxJZVg_WyNWTyBZ';
+  var form = document.getElementById('f');
+  var botao = form.querySelector('button[type=submit]');
+  var enviando = false;
+
+  function telefonesOk() {
     var ruim = Array.prototype.find.call(document.querySelectorAll('.fone'), function (el) {
       var n = el.value.replace(/\D/g, '').length;
       return (el.required || n) && (n < 10 || n > 11);
     });
-    if (ruim) { e.preventDefault(); ruim.focus(); alert('Confira o número com DDD: ' + (ruim.labels[0] ? ruim.labels[0].firstChild.textContent.trim() : '')); }
+    if (ruim) { ruim.focus(); alert('Confira o número com DDD: ' + (ruim.labels[0] ? ruim.labels[0].firstChild.textContent.trim() : '')); return false; }
+    return true;
+  }
+
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    if (enviando || !telefonesOk()) return;
+    enviando = true;
+    botao.disabled = true;
+    botao.textContent = 'Enviando...';
+
+    var fd = new FormData(form);
+    var v = function (k) { var x = (fd.get(k) || '').toString().trim(); return x || null; };
+    var registro = {
+      nome_completo: v('nome_completo'), nome_operacao: v('nome_operacao'), cidade_uf: v('cidade_uf'),
+      email: v('email'), whatsapp_pessoal: v('whatsapp_pessoal'), whatsapp_automacao: v('whatsapp_automacao'),
+      tipo_whatsapp: v('tipo_whatsapp'), aparelhos_conectados: v('aparelhos_conectados'), avisos_para: v('avisos_para'),
+      whatsapp_avisos: v('whatsapp_avisos'), vp_usuario: v('vp_usuario'), vp_analise_credito: v('vp_analise_credito'),
+      apos_aprovacao: v('apos_aprovacao'), horario_atendimento: v('horario_atendimento'), observacoes: v('observacoes'),
+      melhor_horario: v('melhor_horario'), celular_na_ativacao: v('celular_na_ativacao'),
+      aceite_login: fd.get('aceite_login') === 'Sim', aceite_lgpd: fd.get('aceite_lgpd') === 'Sim', aceite_whatsapp: fd.get('aceite_whatsapp') === 'Sim'
+    };
+
+    var paraSupabase = fetch(SUPABASE_URL + '/rest/v1/automacao_cadastros', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, Prefer: 'return=minimal' },
+      body: JSON.stringify(registro)
+    }).then(function (r) { if (!r.ok) return r.text().then(function (t) { throw new Error(t); }); return true; });
+
+    var paraNetlify = fetch('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(fd).toString()
+    }).then(function (r) { return r.ok; });
+
+    Promise.allSettled([paraSupabase, paraNetlify]).then(function (res) {
+      var okPainel = res[0].status === 'fulfilled';
+      var okNetlify = res[1].status === 'fulfilled' && res[1].value;
+      if (okPainel || okNetlify) {
+        window.location.href = '/automacao-obrigado.html';
+      } else {
+        enviando = false;
+        botao.disabled = false;
+        botao.textContent = 'Enviar cadastro';
+        alert('Não foi possível enviar agora. Verifique sua internet e tente de novo.');
+      }
+    });
   });
 </script>
 </body>
