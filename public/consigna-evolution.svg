@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 104 104" role="img" aria-label="Consigna Evolution">
+  <rect x="0" y="0" width="104" height="104" rx="28" fill="#3B0764"/>
+  <rect x="20" y="58" width="16" height="26" rx="8" fill="#DB2777" opacity="0.55"/>
+  <rect x="44" y="42" width="16" height="42" rx="8" fill="#DB2777" opacity="0.8"/>
+  <rect x="68" y="26" width="16" height="58" rx="8" fill="#DB2777"/>
+  <circle cx="76" cy="14" r="7" fill="#10B981"/>
+</svg>

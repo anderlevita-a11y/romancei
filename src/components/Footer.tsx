@@ -1,4 +1,4 @@
-import { Sparkles, Heart, Shield, Lock, MapPin, Phone, MessageCircle, Instagram, Gift, ExternalLink, Share2, UserCheck, Bot } from 'lucide-react';
+import { Sparkles, Heart, Shield, Lock, MapPin, Phone, MessageCircle, Instagram, Gift, ExternalLink, Share2, UserCheck, Bot, BarChart3 } from 'lucide-react';
 import { BusinessSettings } from '../types';
 import { buildWhatsAppLink, buildInstagramLink } from '../utils/validators';
 
@@ -238,6 +238,13 @@ export function Footer({ settings, onOpenAdmin, onOpenLgpd, onScrollToForm, onOp
                 >
                   <Bot className="w-3.5 h-3.5" />
                   <span>Formulário para Automação</span>
+                </a>
+                <a
+                  href="/painel-evolution.html"
+                  className="w-full bg-gradient-to-r from-purple-900 to-fuchsia-700 hover:from-purple-800 hover:to-fuchsia-600 text-white p-3 rounded-2xl border border-fuchsia-400/30 flex items-center justify-center gap-2 transition-all shadow-xs font-semibold"
+                >
+                  <BarChart3 className="w-3.5 h-3.5" />
+                  <span>Painel Consigna Evolution</span>
                 </a>
               </li>
             </ul>
