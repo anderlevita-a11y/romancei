@@ -167,7 +167,7 @@ export function AdminAutomacaoTab() {
         </div>
         <div>
           <h2 className="text-lg font-black text-stone-900 leading-tight">Consigna Evolution · Cadastros</h2>
-          <p className="text-xs text-stone-500">Distribuidores que enviaram o Formulário para Automação</p>
+          <p className="text-xs text-stone-500">Cadastros feitos no Painel Consigna Evolution (dados da automação de cada distribuidor)</p>
         </div>
       </div>
 

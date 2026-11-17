@@ -28,8 +28,11 @@
   .grid{display:grid;gap:14px}
   @media(min-width:760px){.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}}
   label{display:block;font-weight:600;margin:12px 0 6px}
-  input{width:100%;padding:13px 14px;border:1px solid var(--bd);border-radius:12px;font:inherit;font-size:1.05rem;background:#fff;color:var(--txt)}
-  input:focus{outline:2px solid var(--rosa);border-color:transparent}
+  input,select{width:100%;padding:13px 14px;border:1px solid var(--bd);border-radius:12px;font:inherit;font-size:1.05rem;background:#fff;color:var(--txt)}
+  select{-webkit-appearance:none;appearance:none;background:#fff url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' fill='none' stroke='%23777' stroke-width='2'/%3E%3C/svg%3E") no-repeat right 14px center;padding-right:36px}
+  .form select{font-size:1rem;padding:11px 36px 11px 13px}
+  .form h3{font-size:.95rem;margin:18px 0 4px;color:var(--rosa)}
+  input:focus,select:focus{outline:2px solid var(--rosa);border-color:transparent}
   .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:13px 18px;border:0;border-radius:12px;background:var(--rosa);color:#fff;font:600 1rem "Space Grotesk",system-ui,sans-serif;cursor:pointer;text-decoration:none}
   .btn.full{width:100%;margin-top:14px}
   .btn.sec{background:var(--lil);color:var(--roxo)}
@@ -157,6 +160,18 @@
         <div><label for="fVpU">Usuário do Vendas Plus</label><input id="fVpU" autocomplete="off"></div>
         <div><label for="fVpS">Senha do Vendas Plus</label><input id="fVpS" type="password" autocomplete="new-password">
           <span class="cadeado">🔒 Trancada no seu navegador: só o robô consegue abrir</span></div>
+        <div><label for="fTipo">Esse WhatsApp é</label>
+          <select id="fTipo"><option value="">Escolha…</option><option>WhatsApp Business</option><option>WhatsApp comum</option></select></div>
+        <div><label for="fApar">Aparelhos já conectados nesse WhatsApp<span class="ajuda">WhatsApp → Aparelhos conectados. O limite é 4 e o robô ocupa 1</span></label>
+          <select id="fApar"><option value="">Escolha…</option><option value="0">Nenhum</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4 (cheio)">4 (cheio)</option></select></div>
+        <div><label for="fVpA">No seu Vendas Plus aparece o botão "Análise de Crédito"?</label>
+          <select id="fVpA"><option value="">Escolha…</option><option>Sim</option><option>Não</option><option>Não sei</option></select></div>
+      </div>
+      <h3>Atendimento</h3>
+      <div class="grid g2">
+        <div><label for="fApos">Depois que a cliente é aprovada</label>
+          <select id="fApos"><option value="">Escolha…</option><option value="Visita para entregar a maleta/sacola">Visita para entregar a maleta</option><option value="Cliente retira no endereço da distribuidora">Cliente retira</option><option value="Envio por entrega">Envio por entrega</option></select></div>
+        <div><label for="fHor">Dias e horários de atendimento</label><input id="fHor" placeholder="Seg a sex, 9h às 18h; sáb 9h às 12h"></div>
         <div><label for="fAt">Nome de quem atende <span class="ajuda">Opcional. Aparece na mensagem para a cliente</span></label><input id="fAt"></div>
         <div><label for="fObs">Observações <span class="ajuda">Opcional</span></label><textarea id="fObs"></textarea></div>
       </div>
@@ -399,6 +414,8 @@
     $('fVpU').value = c.vp_usuario || ''; $('fVpS').value = '';
     $('fVpS').placeholder = c.tem_senha_vp ? '•••••• (já salva — preencha só para trocar)' : '';
     $('fAt').value = c.atendente || ''; $('fObs').value = c.observacoes || '';
+    $('fTipo').value = c.tipo_whatsapp || ''; $('fApar').value = c.aparelhos_conectados || ''; $('fVpA').value = c.vp_analise_credito || '';
+    $('fApos').value = c.apos_aprovacao || ''; $('fHor').value = c.horario_atendimento || '';
     $('fAceite').checked = !!c.aceite_termos;
     $('cForm').dataset.preenchido = '1';
   }
@@ -420,7 +437,9 @@
     var p = {
       nome: $('fNome').value, nome_operacao: $('fOper').value, cidade: $('fCidade').value, email: $('fEmail').value,
       whatsapp_automacao: soDig($('fWa').value), whatsapp_avisos: soDig($('fAv').value), vp_usuario: $('fVpU').value,
-      atendente: $('fAt').value, observacoes: $('fObs').value, aceite_termos: $('fAceite').checked
+      atendente: $('fAt').value, observacoes: $('fObs').value, aceite_termos: $('fAceite').checked,
+      tipo_whatsapp: $('fTipo').value, aparelhos_conectados: $('fApar').value, vp_analise_credito: $('fVpA').value,
+      apos_aprovacao: $('fApos').value, horario_atendimento: $('fHor').value
     };
     if (!senha && !c.tem_senha_vp) return msg('msgForm', 'err', 'Informe a senha do Vendas Plus.');
     if (!p.aceite_termos) return msg('msgForm', 'err', 'Marque a autorização para continuar.');
@@ -439,7 +458,12 @@
       var e = r && r.erro, t = {
         nome: 'Informe seu nome completo.', nome_operacao: 'Informe o nome da operação.', whatsapp_automacao: 'Confira o WhatsApp que o robô vai atender (com DDD).',
         vp_usuario: 'Informe o usuário do Vendas Plus.', vp_senha: 'Informe a senha do Vendas Plus.', aceite_termos: 'Marque a autorização para continuar.',
-        whatsapp_em_uso: 'Este WhatsApp já está cadastrado em outra conta. Fale com o suporte.'
+        whatsapp_em_uso: 'Este WhatsApp já está cadastrado em outra conta. Fale com o suporte.',
+        tipo_whatsapp: 'Diga se o WhatsApp do robô é Business ou comum.', aparelhos_conectados: 'Informe quantos aparelhos já estão conectados.',
+        aparelhos_cheio: 'Esse WhatsApp já tem 4 aparelhos conectados. Desconecte um (WhatsApp → Aparelhos conectados) para o robô entrar.',
+        vp_analise_credito: 'Responda se aparece o botão "Análise de Crédito" no Vendas Plus.',
+        vp_sem_analise: 'O robô precisa do botão "Análise de Crédito" no Vendas Plus. Peça a liberação à sua gerente antes de continuar.',
+        apos_aprovacao: 'Escolha o que acontece depois que a cliente é aprovada.', horario_atendimento: 'Informe os dias e horários de atendimento.'
       }[e] || 'Não foi possível salvar. Tente de novo.';
       msg('msgForm', 'err', t);
     }).catch(function (e) {
@@ -535,7 +559,8 @@
     var linhas = [['Responsável', c.nome || ds.nome], ['Operação', c.nome_operacao || ds.nome_operacao], ['Cidade', c.cidade || ds.cidade],
                   ['WhatsApp do robô', (c.whatsapp_automacao || ds.whatsapp_automacao) ? fmtTel(c.whatsapp_automacao || ds.whatsapp_automacao) : null],
                   ['Avisos para', c.whatsapp_avisos ? fmtTel(c.whatsapp_avisos) : null], ['Usuário Vendas Plus', c.vp_usuario],
-                  ['Senha Vendas Plus', c.tem_senha_vp ? '🔒 salva com segurança' : null], ['Login do painel', fmtTel(ds.telefone)]];
+                  ['Senha Vendas Plus', c.tem_senha_vp ? '🔒 salva com segurança' : null], ['Tipo de WhatsApp', c.tipo_whatsapp],
+                  ['Após aprovação', c.apos_aprovacao], ['Atendimento', c.horario_atendimento], ['Login do painel', fmtTel(ds.telefone)]];
     var h = linhas.filter(function (l) { return l[1]; }).map(function (l) { return '<dt>' + esc(l[0]) + '</dt><dd>' + esc(l[1]) + '</dd>'; }).join('');
     $('cad').innerHTML = h || '<dd style="grid-column:1/-1;color:var(--sub)">Cadastro ainda não preenchido.</dd>';
   }

@@ -51,6 +51,12 @@ ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cashback_codigo TE
 ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cashback_valor_centavos INT;
 ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cashback_gerado_em TIMESTAMPTZ;
 ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cashback_usado_em TIMESTAMPTZ;
+-- Dados que antes vinham do "Formulário para Automação" (agora tudo no cadastro do painel)
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS tipo_whatsapp TEXT;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS aparelhos_conectados TEXT;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS vp_analise_credito TEXT;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS apos_aprovacao TEXT;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS horario_atendimento TEXT;
 
 -- ---------- Eventos do robô (só contagem, sem dados pessoais) ----------
 CREATE TABLE IF NOT EXISTS public.ce_eventos (
@@ -303,9 +309,11 @@ BEGIN
       END IF;
       INSERT INTO public.ce_distribuidores (telefone) VALUES (tel) RETURNING * INTO d;
     ELSE
-      INSERT INTO public.ce_distribuidores (telefone, nome, nome_operacao, email, cadastro_id, cidade, whatsapp_automacao, whatsapp_avisos, vp_usuario, instancia, prov_status)
+      INSERT INTO public.ce_distribuidores (telefone, nome, nome_operacao, email, cadastro_id, cidade, whatsapp_automacao, whatsapp_avisos, vp_usuario,
+              tipo_whatsapp, aparelhos_conectados, vp_analise_credito, apos_aprovacao, horario_atendimento, instancia, prov_status)
       VALUES (tel, cad.nome_completo, cad.nome_operacao, cad.email, cad.id, cad.cidade_uf,
               public._ce_tel(cad.whatsapp_automacao), public._ce_tel(cad.whatsapp_avisos), cad.vp_usuario,
+              cad.tipo_whatsapp, cad.aparelhos_conectados, cad.vp_analise_credito, cad.apos_aprovacao, cad.horario_atendimento,
               CASE WHEN cad.instancia IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.ce_distribuidores x WHERE x.instancia = cad.instancia)
                    THEN cad.instancia END,
               CASE WHEN cad.instancia IS NOT NULL THEN 'ativo' ELSE 'aguardando_cadastro' END)
@@ -405,7 +413,10 @@ BEGIN
     'cadastro', jsonb_build_object('nome', d.nome, 'nome_operacao', d.nome_operacao, 'email', d.email, 'cidade', d.cidade,
         'whatsapp_automacao', d.whatsapp_automacao, 'whatsapp_avisos', d.whatsapp_avisos, 'vp_usuario', d.vp_usuario,
         'tem_senha_vp', d.vp_senha_cripto IS NOT NULL, 'atendente', d.atendente, 'observacoes', d.observacoes,
-        'aceite_termos', d.aceite_termos, 'completo', d.cadastro_completo_em IS NOT NULL),
+        'aceite_termos', d.aceite_termos, 'completo', d.cadastro_completo_em IS NOT NULL,
+        'tipo_whatsapp', d.tipo_whatsapp, 'aparelhos_conectados', d.aparelhos_conectados,
+        'vp_analise_credito', d.vp_analise_credito, 'apos_aprovacao', d.apos_aprovacao,
+        'horario_atendimento', d.horario_atendimento),
     'ativacao', jsonb_build_object('status', d.prov_status, 'erro', d.prov_erro, 'codigo', d.prov_codigo,
         'atualizado_em', d.prov_atualizado_em),
     'cashback', jsonb_build_object('codigo', d.cashback_codigo, 'valor', d.cashback_valor_centavos,
@@ -506,6 +517,13 @@ BEGIN
   IF length(coalesce(trim(p->>'vp_usuario'), '')) < 2 THEN RETURN jsonb_build_object('erro', 'vp_usuario'); END IF;
   IF senha IS NULL AND d.vp_senha_cripto IS NULL THEN RETURN jsonb_build_object('erro', 'vp_senha'); END IF;
   IF length(coalesce(senha, '')) > 2000 THEN RETURN jsonb_build_object('erro', 'vp_senha'); END IF;
+  IF coalesce(p->>'tipo_whatsapp', '') NOT IN ('WhatsApp Business', 'WhatsApp comum') THEN RETURN jsonb_build_object('erro', 'tipo_whatsapp'); END IF;
+  IF coalesce(p->>'aparelhos_conectados', '') NOT IN ('0', '1', '2', '3', '4 (cheio)') THEN RETURN jsonb_build_object('erro', 'aparelhos_conectados'); END IF;
+  IF p->>'aparelhos_conectados' = '4 (cheio)' THEN RETURN jsonb_build_object('erro', 'aparelhos_cheio'); END IF;
+  IF coalesce(p->>'vp_analise_credito', '') NOT IN ('Sim', 'Não', 'Não sei') THEN RETURN jsonb_build_object('erro', 'vp_analise_credito'); END IF;
+  IF p->>'vp_analise_credito' = 'Não' THEN RETURN jsonb_build_object('erro', 'vp_sem_analise'); END IF;
+  IF length(coalesce(trim(p->>'apos_aprovacao'), '')) < 3 OR length(p->>'apos_aprovacao') > 120 THEN RETURN jsonb_build_object('erro', 'apos_aprovacao'); END IF;
+  IF length(coalesce(trim(p->>'horario_atendimento'), '')) < 3 OR length(p->>'horario_atendimento') > 300 THEN RETURN jsonb_build_object('erro', 'horario_atendimento'); END IF;
   IF NOT coalesce((p->>'aceite_termos')::boolean, false) THEN RETURN jsonb_build_object('erro', 'aceite_termos'); END IF;
   IF EXISTS (SELECT 1 FROM public.ce_distribuidores x WHERE x.whatsapp_automacao = wa AND x.id <> d.id) THEN
     RETURN jsonb_build_object('erro', 'whatsapp_em_uso');
@@ -523,6 +541,9 @@ BEGIN
     cidade = nullif(trim(p->>'cidade'), ''), whatsapp_automacao = wa, whatsapp_avisos = av,
     vp_usuario = trim(p->>'vp_usuario'), vp_senha_cripto = coalesce(senha, vp_senha_cripto),
     atendente = nullif(trim(p->>'atendente'), ''), observacoes = nullif(trim(p->>'observacoes'), ''),
+    tipo_whatsapp = p->>'tipo_whatsapp', aparelhos_conectados = p->>'aparelhos_conectados',
+    vp_analise_credito = p->>'vp_analise_credito', apos_aprovacao = trim(p->>'apos_aprovacao'),
+    horario_atendimento = trim(p->>'horario_atendimento'),
     aceite_termos = true, instancia = inst, cadastro_completo_em = coalesce(cadastro_completo_em, now()),
     -- dados de acesso mudaram num robô já configurado: reconfigura
     prov_status = CASE WHEN mudou_senha AND prov_status IN ('ativo', 'aguardando_conexao', 'erro', 'reconectar') THEN 'pendente' ELSE prov_status END,
@@ -532,15 +553,19 @@ BEGIN
   -- Espelha no painel administrativo do site (aba Automação), sem a senha
   IF d.cadastro_id IS NULL THEN
     INSERT INTO public.automacao_cadastros (status, nome_completo, nome_operacao, cidade_uf, email, whatsapp_pessoal,
-        whatsapp_automacao, whatsapp_avisos, vp_usuario, observacoes, aceite_login, aceite_lgpd, aceite_whatsapp, instancia)
+        whatsapp_automacao, whatsapp_avisos, vp_usuario, observacoes, aceite_login, aceite_lgpd, aceite_whatsapp, instancia,
+        tipo_whatsapp, aparelhos_conectados, vp_analise_credito, apos_aprovacao, horario_atendimento)
     VALUES ('novo', d.nome, d.nome_operacao, d.cidade, d.email, d.telefone, d.whatsapp_automacao, d.whatsapp_avisos,
-        d.vp_usuario, d.observacoes, true, true, true, d.instancia)
+        d.vp_usuario, d.observacoes, true, true, true, d.instancia,
+        d.tipo_whatsapp, d.aparelhos_conectados, d.vp_analise_credito, d.apos_aprovacao, d.horario_atendimento)
     RETURNING id INTO cid;
     UPDATE public.ce_distribuidores SET cadastro_id = cid WHERE id = d.id;
   ELSE
     UPDATE public.automacao_cadastros SET nome_completo = d.nome, nome_operacao = d.nome_operacao, cidade_uf = d.cidade,
         email = d.email, whatsapp_automacao = d.whatsapp_automacao, whatsapp_avisos = d.whatsapp_avisos,
-        vp_usuario = d.vp_usuario, observacoes = d.observacoes, instancia = d.instancia
+        vp_usuario = d.vp_usuario, observacoes = d.observacoes, instancia = d.instancia,
+        tipo_whatsapp = d.tipo_whatsapp, aparelhos_conectados = d.aparelhos_conectados, vp_analise_credito = d.vp_analise_credito,
+        apos_aprovacao = d.apos_aprovacao, horario_atendimento = d.horario_atendimento
      WHERE id = d.cadastro_id;
   END IF;
 

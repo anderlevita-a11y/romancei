@@ -1,4 +1,4 @@
-import { Sparkles, Heart, Shield, Lock, MapPin, Phone, MessageCircle, Instagram, Gift, ExternalLink, Share2, UserCheck, Bot, BarChart3 } from 'lucide-react';
+import { Sparkles, Heart, Shield, Lock, MapPin, Phone, MessageCircle, Instagram, Gift, ExternalLink, Share2, UserCheck, BarChart3 } from 'lucide-react';
 import { BusinessSettings } from '../types';
 import { buildWhatsAppLink, buildInstagramLink } from '../utils/validators';
 
@@ -232,13 +232,6 @@ export function Footer({ settings, onOpenAdmin, onOpenLgpd, onScrollToForm, onOp
                   <Lock className="w-3.5 h-3.5 text-stone-400" />
                   <span>Painel da Distribuidora (Admin)</span>
                 </button>
-                <a
-                  href="/painel-evolution.html?novo=1"
-                  className="w-full bg-gradient-to-r from-rose-600 to-rose-800 hover:from-rose-500 hover:to-rose-700 text-white p-3 rounded-2xl border border-rose-400/30 flex items-center justify-center gap-2 transition-all shadow-xs font-semibold"
-                >
-                  <Bot className="w-3.5 h-3.5" />
-                  <span>Formulário para Automação</span>
-                </a>
                 <a
                   href="/painel-evolution.html"
                   className="w-full bg-gradient-to-r from-purple-900 to-fuchsia-700 hover:from-purple-800 hover:to-fuchsia-600 text-white p-3 rounded-2xl border border-fuchsia-400/30 flex items-center justify-center gap-2 transition-all shadow-xs font-semibold"
