@@ -288,6 +288,7 @@
     if (!t) { mostrarLogin(); return Promise.resolve(); }
     return rpc('ce_painel', { p_token: t }).then(function (d) {
       dados = d;
+      if ($('msgPainel').classList.contains('err')) msg('msgPainel');
       $('vLogin').classList.add('oculto'); $('vPainel').classList.remove('oculto'); $('sair').classList.remove('oculto');
       desenhar();
     }).catch(function (e) {
