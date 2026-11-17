@@ -2,7 +2,14 @@
 
 Página: **https://romancei.netlify.app/painel-evolution.html** (botão "Painel Consigna Evolution" no rodapé do site).
 
-O distribuidor entra com o WhatsApp do cadastro e recebe um código de 6 dígitos pelo robô.
+O distribuidor cria a conta com o WhatsApp pessoal (código de 6 dígitos enviado pelo robô), preenche o
+cadastro no próprio painel (o antigo "Formulário para Automação" agora leva para lá) e paga.
+**A ativação é automática:** o robô salva o distribuidor, testa o login do Vendas Plus, cria o número na
+Evolution e mostra no painel o código de 8 letras para conectar o WhatsApp. Quando conecta, fica "ativo".
+A senha do Vendas Plus é trancada no navegador com a chave do robô (`config/painel-chave.pem`):
+nem o Supabase nem o administrador conseguem ler. **Faça backup desse arquivo** — sem ele, os
+distribuidores precisam salvar a senha de novo.
+Na 1ª mensalidade paga, o painel libera um cupom de **R$ 50 de cashback** (CE50-XXXXX) para o Consigna On Demand.
 O painel mostra se o robô está ativo, as conversas da semana e do mês, aprovadas e reprovadas,
 o cadastro e o plano (ativação R$ 297 + R$ 147/mês, por Pix ou cartão, no AbacatePay).
 Quando o pagamento é confirmado, o robô daquele distribuidor é liberado sozinho.

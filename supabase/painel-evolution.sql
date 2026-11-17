@@ -32,6 +32,26 @@ CREATE TABLE IF NOT EXISTS public.ce_distribuidores (
     falhas_pagamento INT NOT NULL DEFAULT 0
 );
 
+-- Cadastro feito dentro do painel + ativação automática + cashback
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cidade TEXT;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS whatsapp_automacao TEXT;      -- número que o robô vai atender
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS whatsapp_avisos TEXT;         -- recebe avisos de aprovadas
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS vp_usuario TEXT;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS vp_senha_cripto TEXT;         -- trancada no navegador; só o robô abre
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS atendente TEXT;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS observacoes TEXT;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS aceite_termos BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cadastro_completo_em TIMESTAMPTZ;
+-- aguardando_cadastro | aguardando_pagamento | pendente | criando | testando_login | aguardando_conexao | reconectar | ativo | erro
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS prov_status TEXT NOT NULL DEFAULT 'aguardando_cadastro';
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS prov_erro TEXT;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS prov_codigo TEXT;             -- código de conexão do WhatsApp
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS prov_atualizado_em TIMESTAMPTZ;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cashback_codigo TEXT UNIQUE;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cashback_valor_centavos INT;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cashback_gerado_em TIMESTAMPTZ;
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cashback_usado_em TIMESTAMPTZ;
+
 -- ---------- Eventos do robô (só contagem, sem dados pessoais) ----------
 CREATE TABLE IF NOT EXISTS public.ce_eventos (
     id BIGSERIAL PRIMARY KEY,
@@ -134,6 +154,29 @@ LANGUAGE sql STABLE AS $$
   SELECT d.isento OR (d.ativacao_paga_em IS NOT NULL AND d.assinatura_status = 'ACTIVE');
 $$;
 
+-- Decide o próximo passo da ativação automática
+CREATE OR REPLACE FUNCTION public._ce_avaliar(p_id uuid) RETURNS void
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
+DECLARE d public.ce_distribuidores;
+BEGIN
+  SELECT * INTO d FROM public.ce_distribuidores WHERE id = p_id;
+  IF d.id IS NULL OR d.cadastro_completo_em IS NULL THEN RETURN; END IF;
+  IF d.prov_status IN ('aguardando_cadastro', 'aguardando_pagamento') THEN
+    UPDATE public.ce_distribuidores
+       SET prov_status = CASE WHEN d.isento OR d.ativacao_paga_em IS NOT NULL THEN 'pendente' ELSE 'aguardando_pagamento' END,
+           prov_erro = NULL, prov_atualizado_em = now()
+     WHERE id = p_id;
+  END IF;
+END $$;
+REVOKE ALL ON FUNCTION public._ce_avaliar(uuid) FROM public, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public._ce_slug(t text) RETURNS text
+LANGUAGE sql IMMUTABLE AS $$
+  SELECT trim(both '-' from left(regexp_replace(lower(translate(coalesce(t, ''),
+    'áàâãäéèêëíìîïóòôõöúùûüçñÁÀÂÃÄÉÈÊËÍÌÎÏÓÒÔÕÖÚÙÛÜÇÑ', 'aaaaaeeeeiiiiooooouuuucnaaaaaeeeeiiiiooooouuuucn')),
+    '[^a-z0-9]+', '-', 'g'), 22));
+$$;
+
 CREATE OR REPLACE FUNCTION public._ce_sessao(p_token text) RETURNS public.ce_distribuidores
 LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
 DECLARE d public.ce_distribuidores;
@@ -169,12 +212,14 @@ BEGIN
   IF NOT public._ce_robo_ok(p_token) THEN RAISE EXCEPTION 'token_invalido'; END IF;
   IF length(tel) < 12 THEN RAISE EXCEPTION 'telefone_invalido'; END IF;
   UPDATE public.ce_distribuidores SET instancia = NULL WHERE instancia = p_instancia AND telefone <> tel;
-  INSERT INTO public.ce_distribuidores (telefone, nome, instancia, isento)
-  VALUES (tel, p_nome, p_instancia, coalesce(p_isento, false))
+  -- cadastrado à mão no robô (./admin.sh): já está configurado
+  INSERT INTO public.ce_distribuidores (telefone, nome, instancia, isento, prov_status, prov_atualizado_em)
+  VALUES (tel, p_nome, p_instancia, coalesce(p_isento, false), 'ativo', now())
   ON CONFLICT (telefone) DO UPDATE
      SET instancia = EXCLUDED.instancia,
          nome = coalesce(public.ce_distribuidores.nome, EXCLUDED.nome),
-         isento = public.ce_distribuidores.isento OR EXCLUDED.isento;
+         isento = public.ce_distribuidores.isento OR EXCLUDED.isento,
+         prov_status = 'ativo', prov_erro = NULL, prov_atualizado_em = now();
 END $$;
 
 CREATE OR REPLACE FUNCTION public.ce_robo_evento(p_token text, p_instancia text, p_tipo text)
@@ -197,7 +242,13 @@ BEGIN
     ON CONFLICT (instancia) DO UPDATE
        SET ultimo_sinal = now(), whatsapp_conectado = EXCLUDED.whatsapp_conectado, robo_ativo = EXCLUDED.robo_ativo;
     SELECT * INTO d FROM public.ce_distribuidores WHERE instancia = it->>'instancia';
-    IF d.id IS NOT NULL THEN res := res || jsonb_build_object(d.instancia, public._ce_liberado(d)); END IF;
+    IF d.id IS NOT NULL THEN
+      res := res || jsonb_build_object(d.instancia, public._ce_liberado(d));
+      IF (it->>'conectado')::boolean AND d.prov_status = 'aguardando_conexao' THEN
+        UPDATE public.ce_distribuidores SET prov_status = 'ativo', prov_codigo = NULL, prov_erro = NULL, prov_atualizado_em = now() WHERE id = d.id;
+        UPDATE public.automacao_cadastros SET status = 'ativado' WHERE id = d.cadastro_id AND status <> 'cancelado';
+      END IF;
+    END IF;
   END LOOP;
   -- limpeza leve
   DELETE FROM public.ce_codigos WHERE criado_em < now() - interval '1 day';
@@ -227,7 +278,8 @@ END $$;
 -- ==============================================================================
 
 -- Pede um código. Resposta sempre 'ok' (não revela se o número existe), ou 'aguarde'.
-CREATE OR REPLACE FUNCTION public.ce_pedir_codigo(p_telefone text)
+DROP FUNCTION IF EXISTS public.ce_pedir_codigo(text);
+CREATE OR REPLACE FUNCTION public.ce_pedir_codigo(p_telefone text, p_novo boolean DEFAULT false)
 RETURNS text LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public, extensions AS $$
 DECLARE tel text := public._ce_tel(p_telefone); d public.ce_distribuidores; cad record; cod text;
 BEGIN
@@ -244,14 +296,21 @@ BEGIN
        AND tel IN (public._ce_tel(a.whatsapp_pessoal), public._ce_tel(a.whatsapp_avisos), public._ce_tel(a.whatsapp_automacao))
      ORDER BY a.created_at DESC LIMIT 1;
     IF cad.id IS NULL THEN
-      PERFORM pg_sleep(0.3);
-      RETURN 'ok';
+      IF NOT coalesce(p_novo, false) THEN PERFORM pg_sleep(0.3); RETURN 'ok'; END IF;
+      -- Conta nova pelo painel. Limite geral para ninguém usar o robô para mandar mensagens em massa.
+      IF (SELECT count(*) FROM public.ce_distribuidores WHERE created_at > now() - interval '1 hour' AND cadastro_completo_em IS NULL) >= 20 THEN
+        RETURN 'aguarde';
+      END IF;
+      INSERT INTO public.ce_distribuidores (telefone) VALUES (tel) RETURNING * INTO d;
+    ELSE
+      INSERT INTO public.ce_distribuidores (telefone, nome, nome_operacao, email, cadastro_id, cidade, whatsapp_automacao, whatsapp_avisos, vp_usuario, instancia, prov_status)
+      VALUES (tel, cad.nome_completo, cad.nome_operacao, cad.email, cad.id, cad.cidade_uf,
+              public._ce_tel(cad.whatsapp_automacao), public._ce_tel(cad.whatsapp_avisos), cad.vp_usuario,
+              CASE WHEN cad.instancia IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.ce_distribuidores x WHERE x.instancia = cad.instancia)
+                   THEN cad.instancia END,
+              CASE WHEN cad.instancia IS NOT NULL THEN 'ativo' ELSE 'aguardando_cadastro' END)
+      RETURNING * INTO d;
     END IF;
-    INSERT INTO public.ce_distribuidores (telefone, nome, nome_operacao, email, cadastro_id, instancia)
-    VALUES (tel, cad.nome_completo, cad.nome_operacao, cad.email, cad.id,
-            CASE WHEN cad.instancia IS NOT NULL AND NOT EXISTS (SELECT 1 FROM public.ce_distribuidores x WHERE x.instancia = cad.instancia)
-                 THEN cad.instancia END)
-    RETURNING * INTO d;
   END IF;
 
   cod := lpad((floor(random() * 1000000))::int::text, 6, '0');
@@ -303,10 +362,10 @@ BEGIN
   liberado := public._ce_liberado(d);
   SELECT * INTO st FROM public.ce_status_robo WHERE instancia = d.instancia;
   online := st.instancia IS NOT NULL AND st.ultimo_sinal > now() - interval '5 minutes';
-  IF d.cadastro_id IS NOT NULL THEN
-    SELECT nome_operacao, cidade_uf, status, whatsapp_automacao, created_at INTO cad
-      FROM public.automacao_cadastros WHERE id = d.cadastro_id;
-  END IF;
+  IF d.instancia IS NULL THEN online := false; END IF;
+  -- sempre executa (sem linha, os campos ficam nulos e o registro fica definido)
+  SELECT a.nome_operacao, a.cidade_uf, a.status, a.whatsapp_automacao, a.created_at INTO cad
+    FROM public.automacao_cadastros a WHERE a.id = d.cadastro_id;
 
   SELECT coalesce(jsonb_object_agg(tipo, n), '{}'::jsonb) INTO semana FROM (
     SELECT tipo, count(*) n FROM public.ce_eventos
@@ -333,8 +392,8 @@ BEGIN
 
   RETURN jsonb_build_object(
     'distribuidor', jsonb_build_object('nome', d.nome, 'nome_operacao', coalesce(d.nome_operacao, cad.nome_operacao),
-        'telefone', d.telefone, 'instancia', d.instancia, 'cidade', cad.cidade_uf,
-        'cadastro_status', cad.status, 'cadastro_em', cad.created_at, 'whatsapp_automacao', cad.whatsapp_automacao),
+        'telefone', d.telefone, 'instancia', d.instancia, 'cidade', coalesce(d.cidade, cad.cidade_uf),
+        'cadastro_status', cad.status, 'cadastro_em', cad.created_at, 'whatsapp_automacao', coalesce(d.whatsapp_automacao, cad.whatsapp_automacao)),
     'plano', jsonb_build_object('isento', d.isento, 'liberado', liberado,
         'ativacao_paga', d.ativacao_paga_em IS NOT NULL, 'ativacao_paga_em', d.ativacao_paga_em,
         'assinatura_status', d.assinatura_status, 'assinatura_metodo', d.assinatura_metodo,
@@ -342,7 +401,16 @@ BEGIN
     'robo', jsonb_build_object('configurado', d.instancia IS NOT NULL, 'online', online,
         'whatsapp_conectado', st.whatsapp_conectado, 'robo_ativo', st.robo_ativo, 'ultimo_sinal', st.ultimo_sinal,
         'ativo', online AND coalesce(st.whatsapp_conectado, false) AND coalesce(st.robo_ativo, false) AND liberado),
-    'semana', semana, 'mes', mes, 'serie', serie, 'pagamentos', pags);
+    'semana', semana, 'mes', mes, 'serie', serie, 'pagamentos', pags,
+    'cadastro', jsonb_build_object('nome', d.nome, 'nome_operacao', d.nome_operacao, 'email', d.email, 'cidade', d.cidade,
+        'whatsapp_automacao', d.whatsapp_automacao, 'whatsapp_avisos', d.whatsapp_avisos, 'vp_usuario', d.vp_usuario,
+        'tem_senha_vp', d.vp_senha_cripto IS NOT NULL, 'atendente', d.atendente, 'observacoes', d.observacoes,
+        'aceite_termos', d.aceite_termos, 'completo', d.cadastro_completo_em IS NOT NULL),
+    'ativacao', jsonb_build_object('status', d.prov_status, 'erro', d.prov_erro, 'codigo', d.prov_codigo,
+        'atualizado_em', d.prov_atualizado_em),
+    'cashback', jsonb_build_object('codigo', d.cashback_codigo, 'valor', d.cashback_valor_centavos,
+        'gerado_em', d.cashback_gerado_em, 'usado_em', d.cashback_usado_em),
+    'chave_publica', (SELECT valor FROM public.ce_config WHERE chave = 'robo_chave_publica'));
 END $$;
 
 -- ==============================================================================
@@ -359,7 +427,7 @@ END $$;
 
 -- Aplica um evento de webhook do AbacatePay (já validado pela function). Idempotente.
 CREATE OR REPLACE FUNCTION public.ce_webhook_aplicar(p jsonb)
-RETURNS text LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
+RETURNS text LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public, extensions AS $$
 DECLARE ev text := p->>'event'; dt jsonb := p->'data'; ext text; did uuid; subs text; tipo text := NULL;
         valor int; metodo text; recibo text;
 BEGIN
@@ -382,10 +450,16 @@ BEGIN
   IF ev = 'checkout.completed' AND coalesce(dt#>>'{checkout,frequency}', 'ONE_TIME') = 'ONE_TIME' AND ext LIKE 'ce-ativ-%' THEN
     tipo := 'ativacao';
     UPDATE public.ce_distribuidores SET ativacao_paga_em = coalesce(ativacao_paga_em, now()) WHERE id = did;
+    PERFORM public._ce_avaliar(did);
   ELSIF ev = 'subscription.completed' AND did IS NOT NULL THEN
     tipo := 'mensalidade';
     UPDATE public.ce_distribuidores SET assinatura_id = subs, assinatura_status = 'ACTIVE', assinatura_metodo = metodo,
-           ultimo_pagamento_em = now(), falhas_pagamento = 0 WHERE id = did;
+           ultimo_pagamento_em = now(), falhas_pagamento = 0,
+           cashback_valor_centavos = coalesce(cashback_valor_centavos, 5000),
+           cashback_gerado_em = coalesce(cashback_gerado_em, now()),
+           cashback_codigo = coalesce(cashback_codigo,
+             'CE50-' || upper(substr(translate(encode(extensions.gen_random_bytes(8), 'base64'), '+/=0O1Il', ''), 1, 5)))
+     WHERE id = did;
   ELSIF ev = 'subscription.renewed' AND did IS NOT NULL THEN
     tipo := 'mensalidade';
     UPDATE public.ce_distribuidores SET assinatura_status = 'ACTIVE', ultimo_pagamento_em = now(), falhas_pagamento = 0 WHERE id = did;
@@ -403,13 +477,149 @@ BEGIN
   RETURN CASE WHEN did IS NULL THEN 'ignorado' ELSE 'ok' END;
 END $$;
 
+-- ==============================================================================
+-- CADASTRO NO PAINEL + ATIVAÇÃO AUTOMÁTICA
+-- ==============================================================================
+
+-- O robô publica a chave pública dele; o navegador tranca a senha do Vendas Plus com ela
+CREATE OR REPLACE FUNCTION public.ce_robo_publicar_chave(p_token text, p_pem text)
+RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public._ce_robo_ok(p_token) THEN RAISE EXCEPTION 'token_invalido'; END IF;
+  IF p_pem NOT LIKE '-----BEGIN PUBLIC KEY-----%' THEN RAISE EXCEPTION 'chave_invalida'; END IF;
+  INSERT INTO public.ce_config (chave, valor) VALUES ('robo_chave_publica', p_pem)
+  ON CONFLICT (chave) DO UPDATE SET valor = EXCLUDED.valor;
+END $$;
+
+-- Salva o cadastro do distribuidor (substitui o Formulário para Automação)
+CREATE OR REPLACE FUNCTION public.ce_salvar_cadastro(p_token text, p jsonb)
+RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
+DECLARE d public.ce_distribuidores; wa text; av text; inst text; senha text; mudou_senha boolean; cid uuid;
+BEGIN
+  d := public._ce_sessao(p_token);
+  wa := public._ce_tel(p->>'whatsapp_automacao');
+  av := coalesce(nullif(public._ce_tel(p->>'whatsapp_avisos'), ''), d.telefone);
+  senha := nullif(p->>'vp_senha_cripto', '');
+  IF length(coalesce(trim(p->>'nome'), '')) < 3 THEN RETURN jsonb_build_object('erro', 'nome'); END IF;
+  IF length(coalesce(trim(p->>'nome_operacao'), '')) < 3 THEN RETURN jsonb_build_object('erro', 'nome_operacao'); END IF;
+  IF length(wa) NOT IN (12, 13) THEN RETURN jsonb_build_object('erro', 'whatsapp_automacao'); END IF;
+  IF length(coalesce(trim(p->>'vp_usuario'), '')) < 2 THEN RETURN jsonb_build_object('erro', 'vp_usuario'); END IF;
+  IF senha IS NULL AND d.vp_senha_cripto IS NULL THEN RETURN jsonb_build_object('erro', 'vp_senha'); END IF;
+  IF length(coalesce(senha, '')) > 2000 THEN RETURN jsonb_build_object('erro', 'vp_senha'); END IF;
+  IF NOT coalesce((p->>'aceite_termos')::boolean, false) THEN RETURN jsonb_build_object('erro', 'aceite_termos'); END IF;
+  IF EXISTS (SELECT 1 FROM public.ce_distribuidores x WHERE x.whatsapp_automacao = wa AND x.id <> d.id) THEN
+    RETURN jsonb_build_object('erro', 'whatsapp_em_uso');
+  END IF;
+  mudou_senha := senha IS NOT NULL OR coalesce(trim(p->>'vp_usuario'), '') <> coalesce(d.vp_usuario, '')
+                 OR wa <> coalesce(d.whatsapp_automacao, '');
+
+  inst := d.instancia;
+  IF inst IS NULL THEN
+    inst := 'ce-' || coalesce(nullif(public._ce_slug(p->>'nome_operacao'), ''), 'dist') || '-' || substr(replace(d.id::text, '-', ''), 1, 4);
+  END IF;
+
+  UPDATE public.ce_distribuidores SET
+    nome = trim(p->>'nome'), nome_operacao = trim(p->>'nome_operacao'), email = nullif(trim(p->>'email'), ''),
+    cidade = nullif(trim(p->>'cidade'), ''), whatsapp_automacao = wa, whatsapp_avisos = av,
+    vp_usuario = trim(p->>'vp_usuario'), vp_senha_cripto = coalesce(senha, vp_senha_cripto),
+    atendente = nullif(trim(p->>'atendente'), ''), observacoes = nullif(trim(p->>'observacoes'), ''),
+    aceite_termos = true, instancia = inst, cadastro_completo_em = coalesce(cadastro_completo_em, now()),
+    -- dados de acesso mudaram num robô já configurado: reconfigura
+    prov_status = CASE WHEN mudou_senha AND prov_status IN ('ativo', 'aguardando_conexao', 'erro', 'reconectar') THEN 'pendente' ELSE prov_status END,
+    prov_erro = CASE WHEN mudou_senha THEN NULL ELSE prov_erro END
+  WHERE id = d.id RETURNING * INTO d;
+
+  -- Espelha no painel administrativo do site (aba Automação), sem a senha
+  IF d.cadastro_id IS NULL THEN
+    INSERT INTO public.automacao_cadastros (status, nome_completo, nome_operacao, cidade_uf, email, whatsapp_pessoal,
+        whatsapp_automacao, whatsapp_avisos, vp_usuario, observacoes, aceite_login, aceite_lgpd, aceite_whatsapp, instancia)
+    VALUES ('novo', d.nome, d.nome_operacao, d.cidade, d.email, d.telefone, d.whatsapp_automacao, d.whatsapp_avisos,
+        d.vp_usuario, d.observacoes, true, true, true, d.instancia)
+    RETURNING id INTO cid;
+    UPDATE public.ce_distribuidores SET cadastro_id = cid WHERE id = d.id;
+  ELSE
+    UPDATE public.automacao_cadastros SET nome_completo = d.nome, nome_operacao = d.nome_operacao, cidade_uf = d.cidade,
+        email = d.email, whatsapp_automacao = d.whatsapp_automacao, whatsapp_avisos = d.whatsapp_avisos,
+        vp_usuario = d.vp_usuario, observacoes = d.observacoes, instancia = d.instancia
+     WHERE id = d.cadastro_id;
+  END IF;
+
+  PERFORM public._ce_avaliar(d.id);
+  RETURN jsonb_build_object('ok', true);
+END $$;
+
+-- Distribuidor pede um código de conexão novo (o anterior vence em poucos minutos)
+CREATE OR REPLACE FUNCTION public.ce_pedir_reconexao(p_token text)
+RETURNS jsonb LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
+DECLARE d public.ce_distribuidores;
+BEGIN
+  d := public._ce_sessao(p_token);
+  IF d.instancia IS NULL OR d.prov_status NOT IN ('aguardando_conexao', 'ativo', 'erro') THEN
+    RETURN jsonb_build_object('erro', 'indisponivel');
+  END IF;
+  IF d.prov_status = 'erro' THEN
+    UPDATE public.ce_distribuidores SET prov_status = 'pendente', prov_erro = NULL, prov_atualizado_em = now() WHERE id = d.id;
+  ELSE
+    UPDATE public.ce_distribuidores SET prov_status = 'reconectar', prov_codigo = NULL, prov_atualizado_em = now() WHERE id = d.id;
+  END IF;
+  RETURN jsonb_build_object('ok', true);
+END $$;
+
+-- Fila do robô: distribuidores para configurar (pendente) ou gerar novo código (reconectar)
+CREATE OR REPLACE FUNCTION public.ce_robo_ativacoes(p_token text)
+RETURNS TABLE (id uuid, acao text, instancia text, nome text, nome_operacao text, cidade text, telefone text,
+               whatsapp_automacao text, whatsapp_avisos text, atendente text, vp_usuario text, vp_senha_cripto text)
+LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public._ce_robo_ok(p_token) THEN RAISE EXCEPTION 'token_invalido'; END IF;
+  -- trava os itens para não serem pegos duas vezes; itens presos há 10 min voltam para a fila
+  UPDATE public.ce_distribuidores SET prov_status = 'pendente', prov_atualizado_em = now()
+   WHERE prov_status IN ('criando', 'testando_login') AND prov_atualizado_em < now() - interval '10 minutes';
+  RETURN QUERY
+  WITH alvo AS (
+    SELECT d.id, CASE d.prov_status WHEN 'reconectar' THEN 'reconectar' ELSE 'configurar' END AS acao
+      FROM public.ce_distribuidores d
+     WHERE d.prov_status IN ('pendente', 'reconectar') AND d.instancia IS NOT NULL
+     ORDER BY d.prov_atualizado_em NULLS FIRST LIMIT 5
+     FOR UPDATE SKIP LOCKED)
+  UPDATE public.ce_distribuidores d SET prov_status = 'criando', prov_atualizado_em = now()
+    FROM alvo WHERE d.id = alvo.id
+  RETURNING d.id, alvo.acao, d.instancia, d.nome, d.nome_operacao, d.cidade, d.telefone,
+            d.whatsapp_automacao, d.whatsapp_avisos, d.atendente, d.vp_usuario, d.vp_senha_cripto;
+END $$;
+
+-- Robô informa o andamento: testando_login | aguardando_conexao (+ código) | ativo | erro (+ mensagem)
+CREATE OR REPLACE FUNCTION public.ce_robo_ativacao_status(p_token text, p_id uuid, p_status text, p_erro text DEFAULT NULL, p_codigo text DEFAULT NULL)
+RETURNS void LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
+BEGIN
+  IF NOT public._ce_robo_ok(p_token) THEN RAISE EXCEPTION 'token_invalido'; END IF;
+  IF p_status NOT IN ('testando_login', 'aguardando_conexao', 'ativo', 'erro') THEN RAISE EXCEPTION 'status_invalido'; END IF;
+  UPDATE public.ce_distribuidores
+     SET prov_status = p_status, prov_erro = left(p_erro, 300),
+         prov_codigo = CASE WHEN p_status = 'aguardando_conexao' THEN p_codigo ELSE NULL END,
+         prov_atualizado_em = now()
+   WHERE id = p_id;
+  IF p_status = 'ativo' THEN
+    UPDATE public.automacao_cadastros a SET status = 'ativado'
+      FROM public.ce_distribuidores d WHERE d.id = p_id AND a.id = d.cadastro_id AND a.status <> 'cancelado';
+  ELSIF p_status IN ('aguardando_conexao', 'testando_login') THEN
+    UPDATE public.automacao_cadastros a SET status = 'em_ativacao'
+      FROM public.ce_distribuidores d WHERE d.id = p_id AND a.id = d.cadastro_id AND a.status = 'novo';
+  END IF;
+END $$;
+
 -- ---------- Permissões ----------
 REVOKE ALL ON FUNCTION public.ce_robo_registrar(text, text, text, text, boolean) FROM public;
 REVOKE ALL ON FUNCTION public.ce_robo_evento(text, text, text) FROM public;
 REVOKE ALL ON FUNCTION public.ce_robo_sinal(text, jsonb) FROM public;
 REVOKE ALL ON FUNCTION public.ce_robo_codigos(text) FROM public;
 REVOKE ALL ON FUNCTION public.ce_robo_codigo_enviado(text, bigint) FROM public;
-REVOKE ALL ON FUNCTION public.ce_pedir_codigo(text) FROM public;
+REVOKE ALL ON FUNCTION public.ce_pedir_codigo(text, boolean) FROM public;
+REVOKE ALL ON FUNCTION public.ce_robo_publicar_chave(text, text) FROM public;
+REVOKE ALL ON FUNCTION public.ce_salvar_cadastro(text, jsonb) FROM public;
+REVOKE ALL ON FUNCTION public.ce_pedir_reconexao(text) FROM public;
+REVOKE ALL ON FUNCTION public.ce_robo_ativacoes(text) FROM public;
+REVOKE ALL ON FUNCTION public.ce_robo_ativacao_status(text, uuid, text, text, text) FROM public;
 REVOKE ALL ON FUNCTION public.ce_entrar(text, text) FROM public;
 REVOKE ALL ON FUNCTION public.ce_sair(text) FROM public;
 REVOKE ALL ON FUNCTION public.ce_painel(text) FROM public;
@@ -421,7 +631,12 @@ GRANT EXECUTE ON FUNCTION public.ce_robo_evento(text, text, text) TO anon, authe
 GRANT EXECUTE ON FUNCTION public.ce_robo_sinal(text, jsonb) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ce_robo_codigos(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ce_robo_codigo_enviado(text, bigint) TO anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.ce_pedir_codigo(text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ce_pedir_codigo(text, boolean) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ce_robo_publicar_chave(text, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ce_salvar_cadastro(text, jsonb) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ce_pedir_reconexao(text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ce_robo_ativacoes(text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ce_robo_ativacao_status(text, uuid, text, text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ce_entrar(text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ce_sair(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ce_painel(text) TO anon, authenticated;

@@ -80,6 +80,20 @@
   dl{display:grid;grid-template-columns:auto 1fr;gap:6px 14px;margin:0;font-size:.92rem}
   dt{color:var(--sub)} dd{margin:0;font-weight:500}
   footer{text-align:center;color:var(--sub);font-size:.82rem;padding:0 20px 30px}
+  .form .grid{gap:0 14px}
+  .form input,.form textarea{font-size:1rem;padding:11px 13px}
+  .form textarea{width:100%;min-height:70px;border:1px solid var(--bd);border-radius:12px;font:inherit;resize:vertical}
+  .ajuda{display:block;font-weight:400;color:var(--sub);font-size:.82rem;margin-top:2px}
+  .aceite{display:flex;gap:10px;align-items:flex-start;font-weight:400;margin:14px 0 4px;font-size:.9rem}
+  .aceite input{width:18px;height:18px;margin-top:3px;accent-color:var(--rosa);flex:none}
+  .cadeado{display:inline-flex;gap:6px;align-items:center;background:#e7f8f1;color:#065f46;border-radius:8px;padding:4px 8px;font-size:.78rem;font-weight:600;margin-top:6px}
+  .codigo{font-size:2rem;font-weight:700;letter-spacing:.12em;color:var(--roxo);background:var(--lil);border-radius:14px;padding:10px 16px;display:inline-block;margin:8px 0}
+  .passos-wa{margin:6px 0 0;padding-left:18px;font-size:.9rem;color:var(--sub)}
+  .cash{background:linear-gradient(135deg,#ecfdf5,#f1e8fb);border:1px solid #c7eedd}
+  .cash .valor{font-size:1.9rem;font-weight:700;color:#047857;letter-spacing:-.02em}
+  .cupom{font-family:ui-monospace,Menlo,monospace;font-size:1.25rem;font-weight:700;background:#fff;border:2px dashed var(--verde);border-radius:12px;padding:8px 14px;display:inline-block;margin-top:6px;color:var(--roxo)}
+  .girando{display:inline-block;width:14px;height:14px;border:2px solid var(--lil);border-top-color:var(--rosa);border-radius:50%;animation:g 1s linear infinite;vertical-align:-2px;margin-right:6px}
+  @keyframes g{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -93,12 +107,12 @@
 </div></header>
 
 <main>
-  <!-- ===================== LOGIN ===================== -->
+  <!-- ===================== LOGIN / CRIAR CONTA ===================== -->
   <section id="vLogin" class="card login">
-    <h2>Entrar no painel</h2>
-    <p class="d">Use o WhatsApp que você informou no cadastro. Vamos enviar um código de acesso por lá.</p>
+    <h2 id="tLogin">Entrar no painel</h2>
+    <p class="d" id="dLogin">Use o WhatsApp do seu cadastro. Vamos enviar um código de acesso por lá.</p>
     <div id="passoTel">
-      <label for="tel">Seu WhatsApp (com DDD)</label>
+      <label for="tel">Seu WhatsApp pessoal (com DDD)</label>
       <input id="tel" type="tel" inputmode="tel" placeholder="(47) 99999-9999" autocomplete="tel">
       <button class="btn full" id="btnCodigo">Receber código no WhatsApp</button>
     </div>
@@ -109,14 +123,14 @@
       <button class="btn sec full" id="btnOutro" type="button">Usar outro número</button>
     </div>
     <div id="msgLogin" class="msg"></div>
-    <p class="d" style="margin:16px 0 0">Ainda não é cliente? <a class="link" href="/automacao.html">Preencha o Formulário para Automação</a>.</p>
+    <p class="d" style="margin:16px 0 0" id="trocaModo"></p>
   </section>
 
   <!-- ===================== PAINEL ===================== -->
   <div id="vPainel" class="oculto">
     <div id="msgPainel" class="msg"></div>
 
-    <section class="card">
+    <section class="card" id="cStatus">
       <div class="status">
         <span class="pill" id="pill"><i></i><span id="pillTxt">—</span></span>
         <div style="color:var(--sub);font-size:.9rem" id="statusSub"></div>
@@ -124,7 +138,35 @@
       <ul class="checks" id="checks"></ul>
     </section>
 
-    <section class="card">
+    <section class="card" id="cAtiv">
+      <h2>Ativação do seu robô</h2>
+      <p class="d">Tudo pelo painel: cadastro, pagamento e conexão do WhatsApp. Sem fidelidade.</p>
+      <div id="passos"></div>
+    </section>
+
+    <section class="card form oculto" id="cForm">
+      <h2>Cadastro da automação</h2>
+      <p class="d">Com estes dados o robô se configura sozinho no seu número.</p>
+      <div class="grid g2">
+        <div><label for="fNome">Seu nome completo</label><input id="fNome" autocomplete="name"></div>
+        <div><label for="fOper">Nome da operação / filial<span class="ajuda">Ex.: Romance Balneário Camboriú</span></label><input id="fOper"></div>
+        <div><label for="fCidade">Cidade / UF</label><input id="fCidade" placeholder="Itapema/SC"></div>
+        <div><label for="fEmail">E-mail <span class="ajuda">Para recibos e avisos</span></label><input id="fEmail" type="email" autocomplete="email"></div>
+        <div><label for="fWa">WhatsApp que o robô vai atender<span class="ajuda">O número que recebe os leads dos anúncios</span></label><input id="fWa" type="tel" inputmode="tel" placeholder="(47) 99999-9999"></div>
+        <div><label for="fAv">WhatsApp que recebe os avisos <span class="ajuda">Aprovadas e endereços. Em branco = seu número de login</span></label><input id="fAv" type="tel" inputmode="tel"></div>
+        <div><label for="fVpU">Usuário do Vendas Plus</label><input id="fVpU" autocomplete="off"></div>
+        <div><label for="fVpS">Senha do Vendas Plus</label><input id="fVpS" type="password" autocomplete="new-password">
+          <span class="cadeado">🔒 Trancada no seu navegador: só o robô consegue abrir</span></div>
+        <div><label for="fAt">Nome de quem atende <span class="ajuda">Opcional. Aparece na mensagem para a cliente</span></label><input id="fAt"></div>
+        <div><label for="fObs">Observações <span class="ajuda">Opcional</span></label><textarea id="fObs"></textarea></div>
+      </div>
+      <label class="aceite"><input type="checkbox" id="fAceite"><span>Autorizo o robô a entrar no Vendas Plus com meu usuário para fazer as análises de crédito pedidas pelas clientes, que autorizam a consulta na conversa (LGPD). Entendo que a conexão do WhatsApp não é oficial da Meta e que o serviço pode ser cancelado a qualquer momento.</span></label>
+      <button class="btn full" id="btnSalvar">Salvar cadastro</button>
+      <button class="btn sec full oculto" id="btnCancelar" type="button">Cancelar</button>
+      <div id="msgForm" class="msg"></div>
+    </section>
+
+    <section class="card" id="cRes">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
         <div><h2>Resultados do robô</h2><p class="d" style="margin:0">Leads que mandaram dados no WhatsApp e o resultado da análise.</p></div>
         <div class="tabs"><button data-p="semana" class="at">Últimos 7 dias</button><button data-p="mes">Últimos 30 dias</button></div>
@@ -135,15 +177,16 @@
     </section>
 
     <div class="grid g2">
-      <section class="card" id="cPlano">
-        <h2>Seu plano</h2>
-        <p class="d">Sem fidelidade: cancele quando quiser.</p>
-        <div id="planoCorpo"></div>
+      <section class="card cash" id="cCash">
+        <h2>Cashback Consigna On Demand</h2>
+        <div id="cashCorpo"></div>
       </section>
       <section class="card">
-        <h2>Seu cadastro</h2>
-        <p class="d">Dados enviados no Formulário para Automação.</p>
-        <dl id="cad"></dl>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
+          <h2>Seu cadastro</h2>
+          <button class="btn sec" id="btnEditar" style="padding:7px 12px;font-size:.88rem">Editar</button>
+        </div>
+        <dl id="cad" style="margin-top:10px"></dl>
       </section>
     </div>
 
@@ -167,9 +210,9 @@
   var SUPABASE_KEY = 'sb_publishable_R0re_YsLe2GIIuB-bxJZVg_WyNWTyBZ';
   var CHAVE = 'ce_painel_token';
   var $ = function (id) { return document.getElementById(id); };
-  var dados = null, periodo = 'semana', telAtual = '';
+  var dados = null, periodo = 'semana', telAtual = '', modoNovo = false, editando = false, poll = null;
 
-  function lerToken() { try { return localStorage.getItem(CHAVE) || ''; } catch (e) { return window.__ceTok || ''; } }
+  function lerToken() { try { return localStorage.getItem(CHAVE) || window.__ceTok || ''; } catch (e) { return window.__ceTok || ''; } }
   function gravarToken(t) { window.__ceTok = t; try { t ? localStorage.setItem(CHAVE, t) : localStorage.removeItem(CHAVE); } catch (e) {} }
 
   function rpc(nome, args) {
@@ -187,21 +230,34 @@
   }
   function msg(el, tipo, texto) { var m = $(el); m.className = 'msg ' + (tipo || ''); m.textContent = texto || ''; }
   function soDig(s) { return String(s || '').replace(/\D/g, ''); }
-  function fmtTel(t) { var d = soDig(t).replace(/^55/, ''); return d.length === 11 ? '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7) : t; }
-  function fmtData(s) { if (!s) return '—'; var d = new Date(s); return d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }); }
+  function fmtTel(t) { var d = soDig(t).replace(/^55/, ''); return d.length === 11 ? '(' + d.slice(0, 2) + ') ' + d.slice(2, 7) + '-' + d.slice(7) : (d.length === 10 ? '(' + d.slice(0, 2) + ') ' + d.slice(2, 6) + '-' + d.slice(6) : t); }
+  function fmtData(s) { if (!s) return '—'; return new Date(s).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }); }
   function fmtValor(c) { return c == null ? '—' : (c / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
 
-  // ---------------- LOGIN ----------------
+  // ---------------- LOGIN / CRIAR CONTA ----------------
+  function modo(novo) {
+    modoNovo = novo;
+    $('tLogin').textContent = novo ? 'Criar minha conta' : 'Entrar no painel';
+    $('dLogin').textContent = novo
+      ? 'Comece pelo seu WhatsApp pessoal. Enviamos um código para confirmar que o número é seu; depois você preenche o cadastro aqui mesmo.'
+      : 'Use o WhatsApp do seu cadastro. Vamos enviar um código de acesso por lá.';
+    $('trocaModo').innerHTML = novo
+      ? 'Já tem conta? <a class="link" href="#" id="lnkModo">Entrar</a>.'
+      : 'Primeiro acesso? <a class="link" href="#" id="lnkModo">Criar minha conta e ativar o robô</a>.';
+    $('lnkModo').onclick = function (e) { e.preventDefault(); modo(!modoNovo); $('passoCod').classList.add('oculto'); $('passoTel').classList.remove('oculto'); msg('msgLogin'); };
+  }
   $('btnCodigo').onclick = function () {
     var t = soDig($('tel').value);
     if (t.length < 10 || t.length > 13) return msg('msgLogin', 'err', 'Digite o WhatsApp com DDD, ex.: (47) 99999-9999.');
     var b = this; b.disabled = true; msg('msgLogin');
-    rpc('ce_pedir_codigo', { p_telefone: t }).then(function (r) {
-      if (r === 'aguarde') return msg('msgLogin', 'err', 'Muitos pedidos seguidos. Aguarde 15 minutos e tente de novo.');
+    rpc('ce_pedir_codigo', { p_telefone: t, p_novo: modoNovo }).then(function (r) {
+      if (r === 'aguarde') return msg('msgLogin', 'err', 'Muitos pedidos agora. Aguarde alguns minutos e tente de novo.');
       telAtual = t;
       $('passoTel').classList.add('oculto'); $('passoCod').classList.remove('oculto'); $('cod').focus();
-      msg('msgLogin', 'inf', 'Se este número estiver cadastrado, o código chega no WhatsApp em até 1 minuto. Ele vale por 10 minutos.');
+      msg('msgLogin', 'inf', modoNovo
+        ? 'Enviamos um código para o seu WhatsApp. Ele chega em até 1 minuto e vale por 10 minutos.'
+        : 'Se este número estiver cadastrado, o código chega no WhatsApp em até 1 minuto. Não tem conta? Use "Criar minha conta".');
     }).catch(function (e) {
       msg('msgLogin', 'err', e.codigo === 'telefone_invalido' ? 'Número inválido. Use DDD + número.' : 'Não foi possível enviar agora. Tente de novo.');
     }).finally(function () { b.disabled = false; });
@@ -212,16 +268,14 @@
     var b = this; b.disabled = true;
     rpc('ce_entrar', { p_telefone: telAtual, p_codigo: c }).then(function (r) {
       if (r && r.token) { gravarToken(r.token); $('cod').value = ''; msg('msgLogin'); return carregar(); }
-      msg('msgLogin', 'err', r && r.erro === 'codigo_bloqueado'
-        ? 'Muitas tentativas erradas. Peça um novo código.'
-        : 'Código incorreto ou vencido. Confira a mensagem no WhatsApp.');
+      msg('msgLogin', 'err', r && r.erro === 'codigo_bloqueado' ? 'Muitas tentativas erradas. Peça um novo código.' : 'Código incorreto ou vencido. Confira a mensagem no WhatsApp.');
     }).catch(function () { msg('msgLogin', 'err', 'Não foi possível entrar agora. Tente de novo.'); })
       .finally(function () { b.disabled = false; });
   };
   $('cod').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('btnEntrar').click(); });
   $('tel').addEventListener('keydown', function (e) { if (e.key === 'Enter') $('btnCodigo').click(); });
   $('btnOutro').onclick = function () { $('passoCod').classList.add('oculto'); $('passoTel').classList.remove('oculto'); msg('msgLogin'); };
-  $('sair').onclick = function () { var t = lerToken(); if (t) rpc('ce_sair', { p_token: t }).catch(function () {}); gravarToken(''); mostrarLogin(); };
+  $('sair').onclick = function () { var t = lerToken(); if (t) rpc('ce_sair', { p_token: t }).catch(function () {}); gravarToken(''); dados = null; mostrarLogin(); };
 
   function mostrarLogin() {
     $('vPainel').classList.add('oculto'); $('sair').classList.add('oculto'); $('vLogin').classList.remove('oculto');
@@ -243,26 +297,157 @@
   }
 
   function desenhar() {
-    var d = dados, ds = d.distribuidor || {}, p = d.plano || {}, r = d.robo || {};
+    var d = dados, ds = d.distribuidor || {}, p = d.plano || {}, r = d.robo || {}, c = d.cadastro || {}, a = d.ativacao || {};
     $('sub').textContent = ds.nome_operacao || ds.nome || 'Painel do distribuidor';
+    var configurado = !!r.configurado && a.status === 'ativo';
 
-    // status
     var ativo = !!r.ativo;
     $('pill').className = 'pill ' + (ativo ? 'on' : 'off');
     $('pillTxt').textContent = ativo ? 'Robô ATIVO' : 'Robô INATIVO';
-    $('statusSub').textContent = r.ultimo_sinal ? 'Último sinal: ' + new Date(r.ultimo_sinal).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'O robô ainda não enviou sinal.';
-    var it = [
-      [!!r.configurado, r.configurado ? 'Seu número está configurado no robô' : 'Aguardando a configuração do seu número (entraremos em contato)'],
+    $('statusSub').textContent = r.ultimo_sinal && configurado ? 'Último sinal: ' + new Date(r.ultimo_sinal).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '';
+    var it = configurado ? [
       [!!r.online, r.online ? 'Robô ligado' : 'Robô sem sinal nos últimos 5 minutos'],
-      [!!r.whatsapp_conectado, r.whatsapp_conectado ? 'WhatsApp conectado' : 'WhatsApp desconectado: reconecte o aparelho'],
+      [!!r.whatsapp_conectado, r.whatsapp_conectado ? 'WhatsApp conectado' : 'WhatsApp desconectado: gere um novo código abaixo'],
       [r.robo_ativo !== false, r.robo_ativo === false ? 'Robô pausado pelo suporte' : 'Atendimento automático ligado'],
-      [!!p.liberado, p.isento ? 'Plano isento' : (p.liberado ? 'Plano em dia' : 'Plano não ativado: conclua o pagamento abaixo')]
-    ];
+      [!!p.liberado, p.isento ? 'Plano isento' : (p.liberado ? 'Plano em dia' : 'Mensalidade pendente')]
+    ] : [[false, 'Conclua a ativação abaixo para ligar o robô']];
     $('checks').innerHTML = it.map(function (x) { return '<li class="' + (x[0] ? 's' : 'n') + '">' + esc(x[1]) + '</li>'; }).join('');
 
-    desenharKpis(); desenharGrafico(); desenharPlano(); desenharCadastro(); desenharPags();
+    $('cRes').classList.toggle('oculto', !ds.instancia || a.status !== 'ativo');
+    var mostrarForm = editando || !c.completo;
+    $('cForm').classList.toggle('oculto', !mostrarForm);
+    $('btnCancelar').classList.toggle('oculto', !c.completo);
+    if (mostrarForm && !$('cForm').dataset.preenchido) preencherForm();
+
+    desenharPassos(); desenharKpis(); desenharGrafico(); desenharCadastro(); desenharCash(); desenharPags();
+    agendarAtualizacao();
   }
 
+  // Atualiza sozinho enquanto o robô está se configurando ou esperando o pagamento
+  function agendarAtualizacao() {
+    var s = dados && dados.ativacao && dados.ativacao.status;
+    var rapido = ['pendente', 'criando', 'testando_login', 'aguardando_conexao', 'reconectar'].indexOf(s) >= 0;
+    clearTimeout(poll);
+    poll = setTimeout(function () { if (!document.hidden && !editando) carregar(); else agendarAtualizacao(); }, rapido ? 5000 : 60000);
+  }
+
+  // ---------------- PASSOS DA ATIVAÇÃO ----------------
+  function passo(n, feito, titulo, texto, extra) {
+    return '<div class="passo"><span class="num ' + (feito ? 'feito' : '') + '">' + (feito ? '✓' : n) + '</span><div style="flex:1">' +
+      '<div class="t">' + titulo + '</div><div class="v">' + texto + '</div>' + (extra || '') + '</div></div>';
+  }
+  function botoesPagar(tipo) {
+    return '<div class="pagar"><button class="btn ok" data-tipo="' + tipo + '" data-m="PIX">Pagar com Pix</button>' +
+           '<button class="btn sec" data-tipo="' + tipo + '" data-m="CARD">Pagar com cartão</button></div>';
+  }
+  function desenharPassos() {
+    var c = dados.cadastro || {}, p = dados.plano || {}, a = dados.ativacao || {}, h = '';
+    var s = a.status || 'aguardando_cadastro';
+    // 1. Cadastro
+    h += passo(1, c.completo, 'Cadastro', c.completo ? 'Concluído. Você pode editar quando quiser.' : 'Preencha o cadastro abaixo.');
+    // 2. Ativação
+    var ap = p.isento || p.ativacao_paga;
+    h += passo(2, ap, p.isento ? 'Ativação · isenta' : 'Ativação · R$ 297 (uma vez)',
+      ap ? (p.isento ? 'Sua operação não paga ativação.' : 'Paga em ' + fmtData(p.ativacao_paga_em) + '.') : 'Libera a configuração automática do robô no seu número.',
+      (!ap && c.completo) ? botoesPagar('ativacao') : '');
+    // 3. Conectar WhatsApp
+    var t3 = '', x3 = '', ok3 = s === 'ativo';
+    if (ok3) t3 = 'WhatsApp conectado ao robô.';
+    else if (!c.completo || !ap) t3 = 'Disponível depois do cadastro e da ativação.';
+    else if (s === 'aguardando_conexao' && a.codigo) {
+      t3 = 'No celular do número <b>' + esc(fmtTel(dados.cadastro.whatsapp_automacao)) + '</b>, digite este código:';
+      x3 = '<div class="codigo">' + esc(a.codigo) + '</div>' +
+        '<ol class="passos-wa"><li>Abra o WhatsApp → ⋮ (ou Configurações) → <b>Aparelhos conectados</b></li><li><b>Conectar aparelho</b> → <b>Conectar com número de telefone</b></li><li>Digite o código acima</li></ol>' +
+        '<p class="v" style="margin:8px 0 0">O código vence em poucos minutos. <a href="#" class="link" id="lnkNovoCod">Gerar novo código</a></p>';
+    } else if (s === 'erro') {
+      t3 = '⚠️ ' + esc(a.erro || 'Não foi possível configurar.');
+      x3 = '<div class="pagar"><button class="btn sec" id="btnCorrigir">Corrigir cadastro</button><button class="btn" id="btnTentar">Tentar de novo</button></div>';
+    } else t3 = '<span class="girando"></span>' + ({ pendente: 'Na fila para configurar…', criando: 'Configurando seu robô…', reconectar: 'Gerando novo código…', testando_login: 'Testando seu acesso ao Vendas Plus…' }[s] || 'Preparando…') + ' Leva até 2 minutos.';
+    h += passo(3, ok3, 'Conectar o WhatsApp', t3, x3);
+    // 4. Mensalidade
+    var m = p.assinatura_status === 'ACTIVE';
+    var t4 = p.isento ? 'Sua operação é isenta de mensalidade.'
+      : m ? 'Ativa · ' + (p.assinatura_metodo === 'CARD' ? 'cartão' : 'Pix Automático') + (p.ultimo_pagamento_em ? ' · último pagamento ' + fmtData(p.ultimo_pagamento_em) : '') + (p.falhas_pagamento > 0 ? ' · ⚠️ última cobrança recusada' : '')
+      : p.assinatura_status === 'CANCELLED' ? 'Cancelada. Assine de novo para religar o robô.'
+      : 'Cobrança automática todo mês. <b>Ganhe R$ 50 de cashback no Consigna On Demand</b> na 1ª mensalidade.';
+    h += passo(4, p.isento || m, p.isento ? 'Mensalidade · isenta' : 'Mensalidade · R$ 147/mês', t4, (!p.isento && !m && ap && c.completo) ? botoesPagar('mensalidade') : '');
+    $('passos').innerHTML = h;
+
+    Array.prototype.forEach.call(document.querySelectorAll('#passos [data-tipo]'), function (b) {
+      b.onclick = function () { pagar(b.getAttribute('data-tipo'), b.getAttribute('data-m'), b); };
+    });
+    var n1 = $('lnkNovoCod'), n2 = $('btnTentar'), n3 = $('btnCorrigir');
+    if (n1) n1.onclick = function (e) { e.preventDefault(); reconectar(); };
+    if (n2) n2.onclick = reconectar;
+    if (n3) n3.onclick = function () { abrirForm(); };
+  }
+  function reconectar() {
+    rpc('ce_pedir_reconexao', { p_token: lerToken() }).then(function (r) {
+      if (r && r.ok) { msg('msgPainel', 'inf', 'Pedido enviado ao robô. Aguarde alguns segundos.'); carregar(); }
+      else msg('msgPainel', 'err', 'Não foi possível agora. Tente de novo em instantes.');
+    }).catch(function () { msg('msgPainel', 'err', 'Sem conexão. Tente de novo.'); });
+  }
+
+  // ---------------- CADASTRO ----------------
+  function preencherForm() {
+    var c = (dados && dados.cadastro) || {}, ds = (dados && dados.distribuidor) || {};
+    $('fNome').value = c.nome || ds.nome || ''; $('fOper').value = c.nome_operacao || ds.nome_operacao || '';
+    $('fCidade').value = c.cidade || ds.cidade || ''; $('fEmail').value = c.email || '';
+    $('fWa').value = c.whatsapp_automacao ? fmtTel(c.whatsapp_automacao) : '';
+    $('fAv').value = c.whatsapp_avisos && c.whatsapp_avisos !== ds.telefone ? fmtTel(c.whatsapp_avisos) : '';
+    $('fVpU').value = c.vp_usuario || ''; $('fVpS').value = '';
+    $('fVpS').placeholder = c.tem_senha_vp ? '•••••• (já salva — preencha só para trocar)' : '';
+    $('fAt').value = c.atendente || ''; $('fObs').value = c.observacoes || '';
+    $('fAceite').checked = !!c.aceite_termos;
+    $('cForm').dataset.preenchido = '1';
+  }
+  function abrirForm() { editando = true; delete $('cForm').dataset.preenchido; desenhar(); $('cForm').scrollIntoView({ behavior: 'smooth' }); }
+  $('btnEditar').onclick = abrirForm;
+  $('btnCancelar').onclick = function () { editando = false; delete $('cForm').dataset.preenchido; msg('msgForm'); desenhar(); };
+
+  function trancarSenha(pem, senha) {
+    var b64 = pem.replace(/-----[^-]+-----/g, '').replace(/\s/g, '');
+    var der = Uint8Array.from(atob(b64), function (ch) { return ch.charCodeAt(0); });
+    return crypto.subtle.importKey('spki', der.buffer, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt'])
+      .then(function (k) { return crypto.subtle.encrypt({ name: 'RSA-OAEP' }, k, new TextEncoder().encode(senha)); })
+      .then(function (buf) { var s = ''; new Uint8Array(buf).forEach(function (x) { s += String.fromCharCode(x); }); return btoa(s); });
+  }
+
+  $('btnSalvar').onclick = function () {
+    var c = (dados && dados.cadastro) || {};
+    var senha = $('fVpS').value;
+    var p = {
+      nome: $('fNome').value, nome_operacao: $('fOper').value, cidade: $('fCidade').value, email: $('fEmail').value,
+      whatsapp_automacao: soDig($('fWa').value), whatsapp_avisos: soDig($('fAv').value), vp_usuario: $('fVpU').value,
+      atendente: $('fAt').value, observacoes: $('fObs').value, aceite_termos: $('fAceite').checked
+    };
+    if (!senha && !c.tem_senha_vp) return msg('msgForm', 'err', 'Informe a senha do Vendas Plus.');
+    if (!p.aceite_termos) return msg('msgForm', 'err', 'Marque a autorização para continuar.');
+    if (senha && !(window.crypto && crypto.subtle)) return msg('msgForm', 'err', 'Seu navegador não permite trancar a senha. Use o Chrome ou o Safari atualizado.');
+    if (senha && !dados.chave_publica) return msg('msgForm', 'err', 'O robô ainda está preparando a proteção de senhas. Tente de novo em alguns minutos.');
+    var b = this; b.disabled = true; msg('msgForm', 'inf', 'Salvando...');
+    (senha ? trancarSenha(dados.chave_publica, senha) : Promise.resolve(null)).then(function (cifrada) {
+      if (cifrada) p.vp_senha_cripto = cifrada;
+      return rpc('ce_salvar_cadastro', { p_token: lerToken(), p: p });
+    }).then(function (r) {
+      if (r && r.ok) {
+        $('fVpS').value = ''; editando = false; delete $('cForm').dataset.preenchido;
+        msg('msgForm'); msg('msgPainel', 'okk', '✅ Cadastro salvo.');
+        return carregar().then(function () { $('cAtiv').scrollIntoView({ behavior: 'smooth' }); });
+      }
+      var e = r && r.erro, t = {
+        nome: 'Informe seu nome completo.', nome_operacao: 'Informe o nome da operação.', whatsapp_automacao: 'Confira o WhatsApp que o robô vai atender (com DDD).',
+        vp_usuario: 'Informe o usuário do Vendas Plus.', vp_senha: 'Informe a senha do Vendas Plus.', aceite_termos: 'Marque a autorização para continuar.',
+        whatsapp_em_uso: 'Este WhatsApp já está cadastrado em outra conta. Fale com o suporte.'
+      }[e] || 'Não foi possível salvar. Tente de novo.';
+      msg('msgForm', 'err', t);
+    }).catch(function (e) {
+      if (e.codigo === 'sessao_invalida') { gravarToken(''); mostrarLogin(); return; }
+      msg('msgForm', 'err', 'Não foi possível salvar agora. Tente de novo.');
+    }).finally(function () { b.disabled = false; });
+  };
+
+  // ---------------- RESULTADOS ----------------
   function desenharKpis() {
     var k = dados[periodo] || {};
     var conv = k.conversa_iniciada || 0, ap = k.consulta_aprovada || 0, rp = k.consulta_reprovada || 0,
@@ -278,25 +463,23 @@
       desenharKpis();
     };
   });
-
   function desenharGrafico() {
     var s = dados.serie || [], svg = $('graf');
     var W = Math.max(svg.clientWidth || 600, 320), H = 190, pl = 28, pb = 22, pt = 8;
     var max = Math.max(1, Math.max.apply(null, s.map(function (x) { return x.conversas; })));
-    var passo = max <= 5 ? 1 : Math.ceil(max / 4);
-    var topo = Math.ceil(max / passo) * passo;
+    var passoY = max <= 5 ? 1 : Math.ceil(max / 4);
+    var topo = Math.ceil(max / passoY) * passoY;
     var n = s.length || 1, bw = (W - pl - 4) / n, y = function (v) { return pt + (H - pt - pb) * (1 - v / topo); };
     var o = '';
-    for (var g = 0; g <= topo; g += passo) {
+    for (var g = 0; g <= topo; g += passoY) {
       o += '<line x1="' + pl + '" x2="' + W + '" y1="' + y(g) + '" y2="' + y(g) + '" stroke="#eee6f5"/>' +
            '<text x="' + (pl - 6) + '" y="' + (y(g) + 4) + '" font-size="10" text-anchor="end" fill="#8b819a">' + g + '</text>';
     }
     s.forEach(function (x, i) {
-      var x0 = pl + i * bw + bw * 0.12, w = bw * 0.76;
+      var x0 = pl + i * bw + bw * 0.12, w = bw * 0.76, wa = w * 0.42;
       var tit = fmtData(x.dia + 'T12:00:00') + ': ' + x.conversas + ' conversas, ' + x.aprovadas + ' aprovadas, ' + x.reprovadas + ' reprovadas';
       o += '<g><title>' + esc(tit) + '</title>';
       if (x.conversas) o += '<rect x="' + x0 + '" y="' + y(x.conversas) + '" width="' + w + '" height="' + (y(0) - y(x.conversas)) + '" rx="3" fill="#d9c7ef"/>';
-      var wa = w * 0.42;
       if (x.aprovadas) o += '<rect x="' + (x0 + w * 0.06) + '" y="' + y(x.aprovadas) + '" width="' + wa + '" height="' + (y(0) - y(x.aprovadas)) + '" rx="2" fill="#10B981"/>';
       if (x.reprovadas) o += '<rect x="' + (x0 + w * 0.52) + '" y="' + y(x.reprovadas) + '" width="' + wa + '" height="' + (y(0) - y(x.reprovadas)) + '" rx="2" fill="#dc2626"/>';
       o += '<rect x="' + (pl + i * bw) + '" y="' + pt + '" width="' + bw + '" height="' + (H - pt - pb) + '" fill="transparent"/></g>';
@@ -309,34 +492,7 @@
     svg.innerHTML = o;
   }
 
-  function botoesPagar(tipo) {
-    return '<div class="pagar"><button class="btn ok" data-tipo="' + tipo + '" data-m="PIX">Pagar com Pix</button>' +
-           '<button class="btn sec" data-tipo="' + tipo + '" data-m="CARD">Pagar com cartão</button></div>';
-  }
-  function desenharPlano() {
-    var p = dados.plano || {}, h = '';
-    if (p.isento) {
-      h = '<div class="passo"><span class="num feito">✓</span><div><div class="t">Plano isento</div><div class="v">Sua operação usa o robô sem mensalidade.</div></div></div>';
-    } else {
-      var a = p.ativacao_paga, m = p.assinatura_status === 'ACTIVE';
-      h += '<div class="passo"><span class="num ' + (a ? 'feito' : '') + '">' + (a ? '✓' : '1') + '</span><div style="flex:1">' +
-           '<div class="t">Ativação · R$ 297 (uma vez)</div><div class="v">' + (a ? 'Paga em ' + fmtData(p.ativacao_paga_em) : 'Configuração do robô no seu número.') + '</div>' +
-           (a ? '' : botoesPagar('ativacao')) + '</div></div>';
-      var vm = m ? ('Ativa · ' + (p.assinatura_metodo === 'CARD' ? 'cartão' : 'Pix Automático') + (p.ultimo_pagamento_em ? ' · último pagamento ' + fmtData(p.ultimo_pagamento_em) : ''))
-                 : p.assinatura_status === 'CANCELLED' ? 'Cancelada. Assine de novo para religar o robô.'
-                 : 'Cobrança automática todo mês, no Pix ou no cartão.';
-      if (m && p.falhas_pagamento > 0) vm += ' · ⚠️ última cobrança recusada, nova tentativa em breve';
-      h += '<div class="passo"><span class="num ' + (m ? 'feito' : '') + '">' + (m ? '✓' : '2') + '</span><div style="flex:1">' +
-           '<div class="t">Mensalidade · R$ 147/mês</div><div class="v">' + esc(vm) + '</div>' +
-           (!m && a ? botoesPagar('mensalidade') : (!m ? '<div class="v" style="margin-top:6px">Disponível depois da ativação.</div>' : '')) + '</div></div>';
-      if (m) h += '<p class="d" style="margin:10px 0 0">Para cancelar ou trocar a forma de pagamento, use o link do recibo enviado por e-mail pelo AbacatePay ou fale com o suporte.</p>';
-    }
-    $('planoCorpo').innerHTML = h;
-    Array.prototype.forEach.call(document.querySelectorAll('#planoCorpo [data-tipo]'), function (b) {
-      b.onclick = function () { pagar(b.getAttribute('data-tipo'), b.getAttribute('data-m'), b); };
-    });
-  }
-
+  // ---------------- PAGAMENTO ----------------
   function pagar(tipo, metodo, botao) {
     botao.disabled = true; msg('msgPainel', 'inf', 'Abrindo o pagamento seguro do AbacatePay...');
     fetch('/.netlify/functions/ce-checkout', {
@@ -357,14 +513,31 @@
       .finally(function () { botao.disabled = false; });
   }
 
-  function desenharCadastro() {
-    var ds = dados.distribuidor || {};
-    var st = { novo: 'Recebido', em_ativacao: 'Em ativação', ativado: 'Ativado', cancelado: 'Cancelado' }[ds.cadastro_status] || ds.cadastro_status || '—';
-    var linhas = [['Responsável', ds.nome], ['Operação', ds.nome_operacao], ['Cidade', ds.cidade], ['WhatsApp do robô', ds.whatsapp_automacao ? fmtTel(ds.whatsapp_automacao) : null],
-                  ['Login do painel', fmtTel(ds.telefone)], ['Status do cadastro', st], ['Cadastro em', ds.cadastro_em ? fmtData(ds.cadastro_em) : null]];
-    $('cad').innerHTML = linhas.filter(function (l) { return l[1]; }).map(function (l) { return '<dt>' + esc(l[0]) + '</dt><dd>' + esc(l[1]) + '</dd>'; }).join('');
+  // ---------------- CASHBACK / CADASTRO / PAGAMENTOS ----------------
+  function desenharCash() {
+    var cb = dados.cashback || {}, p = dados.plano || {};
+    var h;
+    if (cb.codigo) {
+      h = '<div class="valor">' + fmtValor(cb.valor || 5000) + '</div>' +
+          '<p class="d" style="margin:2px 0 6px">Para usar no <b>Consigna On Demand</b>' + (cb.usado_em ? ' · usado em ' + fmtData(cb.usado_em) : '') + '.</p>' +
+          '<div class="cupom">' + esc(cb.codigo) + '</div>' +
+          '<p class="d" style="margin:10px 0 0">Liberado em ' + fmtData(cb.gerado_em) + '. Guarde este código.</p>';
+    } else if (p.isento) {
+      h = '<p class="d" style="margin:0">O cashback vale para quem assina a mensalidade do robô.</p>';
+    } else {
+      h = '<div class="valor">R$ 50,00</div><p class="d" style="margin:2px 0 0">de cashback para usar no <b>Consigna On Demand</b>. Liberado automaticamente quando a sua 1ª mensalidade for confirmada.</p>';
+    }
+    $('cashCorpo').innerHTML = h;
   }
-
+  function desenharCadastro() {
+    var c = dados.cadastro || {}, ds = dados.distribuidor || {};
+    var linhas = [['Responsável', c.nome || ds.nome], ['Operação', c.nome_operacao || ds.nome_operacao], ['Cidade', c.cidade || ds.cidade],
+                  ['WhatsApp do robô', (c.whatsapp_automacao || ds.whatsapp_automacao) ? fmtTel(c.whatsapp_automacao || ds.whatsapp_automacao) : null],
+                  ['Avisos para', c.whatsapp_avisos ? fmtTel(c.whatsapp_avisos) : null], ['Usuário Vendas Plus', c.vp_usuario],
+                  ['Senha Vendas Plus', c.tem_senha_vp ? '🔒 salva com segurança' : null], ['Login do painel', fmtTel(ds.telefone)]];
+    var h = linhas.filter(function (l) { return l[1]; }).map(function (l) { return '<dt>' + esc(l[0]) + '</dt><dd>' + esc(l[1]) + '</dd>'; }).join('');
+    $('cad').innerHTML = h || '<dd style="grid-column:1/-1;color:var(--sub)">Cadastro ainda não preenchido.</dd>';
+  }
   function desenharPags() {
     var l = dados.pagamentos || [];
     $('cPags').classList.toggle('oculto', !l.length);
@@ -377,15 +550,17 @@
     }).join('');
   }
 
-  // Voltou do pagamento: atualiza por 1 minuto até a liberação aparecer
-  var pago = new URLSearchParams(location.search).get('pago');
+  // Voltou do pagamento: confirma em até 1 minuto
+  var qs = new URLSearchParams(location.search);
+  var pago = qs.get('pago');
+  modo(qs.get('novo') === '1');
+  if (pago || qs.get('novo')) history.replaceState(null, '', location.pathname);
   if (pago) {
-    history.replaceState(null, '', location.pathname);
     var n = 0, tim = setInterval(function () {
       n++; carregar().then(function () {
         var p = dados && dados.plano;
         var pronto = p && (pago === 'ativacao' ? p.ativacao_paga : p.assinatura_status === 'ACTIVE');
-        if (pronto) { clearInterval(tim); msg('msgPainel', 'okk', pago === 'ativacao' ? '✅ Ativação confirmada! Agora assine a mensalidade para ligar o robô.' : '✅ Mensalidade confirmada! O robô é liberado em até 1 minuto.'); }
+        if (pronto) { clearInterval(tim); msg('msgPainel', 'okk', pago === 'ativacao' ? '✅ Ativação confirmada! O robô está se configurando no seu número; o código de conexão aparece abaixo.' : '✅ Mensalidade confirmada! O robô é liberado em até 1 minuto e seu cashback já está disponível.'); }
         else if (n >= 12) { clearInterval(tim); msg('msgPainel', 'inf', 'Ainda aguardando a confirmação do pagamento. Pix costuma levar segundos; atualize a página daqui a pouco.'); }
       });
     }, 5000);
@@ -394,7 +569,6 @@
 
   window.addEventListener('resize', function () { if (dados) desenharGrafico(); });
   carregar();
-  setInterval(function () { if (dados && !document.hidden) carregar(); }, 60000);
 })();
 </script>
 </body>

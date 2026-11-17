@@ -233,7 +233,7 @@ export function Footer({ settings, onOpenAdmin, onOpenLgpd, onScrollToForm, onOp
                   <span>Painel da Distribuidora (Admin)</span>
                 </button>
                 <a
-                  href="/automacao.html"
+                  href="/painel-evolution.html?novo=1"
                   className="w-full bg-gradient-to-r from-rose-600 to-rose-800 hover:from-rose-500 hover:to-rose-700 text-white p-3 rounded-2xl border border-rose-400/30 flex items-center justify-center gap-2 transition-all shadow-xs font-semibold"
                 >
                   <Bot className="w-3.5 h-3.5" />
