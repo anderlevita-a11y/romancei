@@ -65,6 +65,17 @@
   .kpi span{color:var(--sub);font-size:.82rem}
   .kpi.ap b{color:#047857}.kpi.rp b{color:#b91c1c}
   .graf{margin-top:16px;overflow-x:auto}
+  .crm{display:grid;grid-template-columns:1fr;gap:16px;margin-top:18px}
+  @media(min-width:760px){.crm{grid-template-columns:3fr 2fr}}
+  .crm h3{font-size:.95rem;margin:0 0 8px}
+  .fun{display:grid;grid-template-columns:auto 1fr auto;gap:6px 10px;align-items:center;font-size:.86rem}
+  .fun .bar{height:14px;border-radius:7px;background:#efe7f7;overflow:hidden}
+  .fun .bar i{display:block;height:100%;border-radius:7px;background:linear-gradient(90deg,var(--roxo),var(--rosa))}
+  .fun b{font-variant-numeric:tabular-nums}
+  .fun small{color:var(--sub);font-size:.76rem}
+  .mot{list-style:none;margin:0;padding:0;font-size:.86rem}
+  .mot li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--bd)}
+  .crm .nota{color:var(--sub);font-size:.78rem;margin-top:8px}
   .leg{display:flex;gap:16px;font-size:.82rem;color:var(--sub);margin-top:6px}
   .leg i{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:6px;vertical-align:-1px}
   /* plano */
@@ -187,6 +198,12 @@
         <div class="tabs"><button data-p="semana" class="at">Últimos 7 dias</button><button data-p="mes">Últimos 30 dias</button></div>
       </div>
       <div class="kpis" id="kpis"></div>
+      <div class="crm">
+        <div><h3>Funil da revendedora</h3><div class="fun" id="funil"></div>
+          <p class="nota">Kit entregue: escreva <b>#entregue</b> na conversa da cliente no WhatsApp do robô.</p></div>
+        <div><h3>Por que chamaram</h3><ul class="mot" id="motivos"></ul>
+          <p class="nota" id="robocrm"></p></div>
+      </div>
       <div class="graf"><svg id="graf" width="100%" height="190" role="img" aria-label="Conversas e aprovações por dia nos últimos 30 dias"></svg></div>
       <div class="leg"><span><i style="background:#d9c7ef"></i>Novos contatos</span><span><i style="background:var(--verde)"></i>Aprovadas</span><span><i style="background:var(--verm)"></i>Reprovadas</span></div>
     </section>
@@ -481,6 +498,23 @@
     var pct = novos ? ' · ' + Math.round(conv * 100 / novos) + '%' : '';
     var c = [['', novos, 'Novos contatos no WhatsApp'], ['', conv, 'Mandaram os dados' + pct], ['ap', ap, 'Aprovadas'], ['rp', rp, 'Reprovadas'], ['', an, 'Em análise / manual'], ['', taxa, 'Taxa de aprovação · ' + en + ' com endereço']];
     $('kpis').innerHTML = c.map(function (x) { return '<div class="kpi ' + x[0] + '"><b>' + esc(x[1]) + '</b><span>' + esc(x[2]) + '</span></div>'; }).join('');
+    // Funil: cada etapa em relação ao total de contatos e à etapa anterior
+    var cons = ap + rp + an, kit = k.kit_entregue || 0, anun = k.contato_anuncio || 0;
+    var etapas = [['Contatos', novos, anun ? anun + ' de anúncio' : ''], ['Mandaram dados', conv, ''], ['Análise feita', cons, ''],
+                  ['Aprovadas', ap, ''], ['Endereço enviado', en, ''], ['Kit entregue', kit, '']];
+    var topo = Math.max(1, novos, conv, cons);
+    $('funil').innerHTML = etapas.map(function (e, i) {
+      var ant = i ? etapas[i - 1][1] : 0, pc = i && ant ? Math.round(e[1] * 100 / ant) + '% da etapa anterior' : e[2];
+      return '<span>' + esc(e[0]) + '</span><div class="bar"><i style="width:' + Math.max(e[1] ? 3 : 0, Math.round(e[1] * 100 / topo)) + '%"></i></div>' +
+             '<b>' + esc(e[1]) + '</b><small style="grid-column:1/-1;margin:-4px 0 4px">' + esc(pc || '') + '</small>';
+    }).join('');
+    var mot = [['motivo_como_funciona', 'Como funciona / quero ser revendedora'], ['motivo_ganhos', 'Ganhos, valores e taxas'], ['motivo_catalogo', 'Catálogo e produtos'],
+               ['motivo_ja_revende', 'Já é revendedora'], ['motivo_outro', 'Outros assuntos']];
+    var totMot = mot.reduce(function (t, m) { return t + (k[m[0]] || 0); }, 0);
+    $('motivos').innerHTML = totMot ? mot.map(function (m) {
+      var v = k[m[0]] || 0; return '<li><span>' + esc(m[1]) + '</span><b>' + v + ' · ' + Math.round(v * 100 / totMot) + '%</b></li>';
+    }).join('') : '<li><span style="color:var(--sub)">Aparece a partir dos próximos contatos.</span></li>';
+    $('robocrm').textContent = 'O robô mandou ' + (k.boas_vindas || 0) + ' boas-vindas e ' + (k.lembrete_enviado || 0) + ' lembretes neste período.';
   }
   Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (b) {
     b.onclick = function () {

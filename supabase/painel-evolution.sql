@@ -73,7 +73,10 @@ DO $$ DECLARE c text; BEGIN
   END LOOP;
 END $$;
 ALTER TABLE public.ce_eventos ADD CONSTRAINT ce_eventos_tipo_check CHECK (tipo IN ('contato_novo','conversa_iniciada',
-  'consulta_aprovada','consulta_reprovada','consulta_analise','consulta_erro','endereco_recebido'));
+  'consulta_aprovada','consulta_reprovada','consulta_analise','consulta_erro','endereco_recebido',
+  -- CRM: origem, motivo do 1º contato (só a categoria), boas-vindas, lembretes e kit entregue (#entregue)
+  'contato_anuncio','boas_vindas','lembrete_enviado','kit_entregue',
+  'motivo_como_funciona','motivo_ganhos','motivo_catalogo','motivo_ja_revende','motivo_outro'));
 
 -- ---------- Sinal de vida do robô por instância ----------
 CREATE TABLE IF NOT EXISTS public.ce_status_robo (
