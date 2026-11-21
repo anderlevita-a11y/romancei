@@ -62,11 +62,18 @@ ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS horario_atendiment
 CREATE TABLE IF NOT EXISTS public.ce_eventos (
     id BIGSERIAL PRIMARY KEY,
     instancia TEXT NOT NULL,
-    tipo TEXT NOT NULL CHECK (tipo IN ('conversa_iniciada','consulta_aprovada','consulta_reprovada',
-                                       'consulta_analise','consulta_erro','endereco_recebido')),
+    tipo TEXT NOT NULL,
     criado_em TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS ce_eventos_inst_data_idx ON public.ce_eventos (instancia, criado_em DESC);
+-- contato_novo = primeira mensagem de um número novo; conversa_iniciada = lead mandou CPF/nascimento/telefone
+DO $$ DECLARE c text; BEGIN
+  FOR c IN SELECT conname FROM pg_constraint WHERE conrelid = 'public.ce_eventos'::regclass AND contype = 'c' LOOP
+    EXECUTE format('ALTER TABLE public.ce_eventos DROP CONSTRAINT %I', c);
+  END LOOP;
+END $$;
+ALTER TABLE public.ce_eventos ADD CONSTRAINT ce_eventos_tipo_check CHECK (tipo IN ('contato_novo','conversa_iniciada',
+  'consulta_aprovada','consulta_reprovada','consulta_analise','consulta_erro','endereco_recebido'));
 
 -- ---------- Sinal de vida do robô por instância ----------
 CREATE TABLE IF NOT EXISTS public.ce_status_robo (
@@ -235,6 +242,34 @@ BEGIN
   INSERT INTO public.ce_eventos (instancia, tipo) VALUES (p_instancia, p_tipo);
 END $$;
 
+-- Importa o histórico que o robô já tinha (data/conversas.json) quando o painel ainda não existia.
+-- p_itens = [{"tipo":"contato_novo","em":"2026-11-16T10:00:00Z"}, ...]. Não duplica:
+--   • contato_novo só entra se a instância ainda não tem nenhum;
+--   • os demais só entram se forem anteriores ao primeiro evento já registrado ao vivo.
+CREATE OR REPLACE FUNCTION public.ce_robo_importar(p_token text, p_instancia text, p_itens jsonb)
+RETURNS int LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
+DECLARE tem_contato boolean; primeiro timestamptz; n int := 0; it jsonb; t text; em timestamptz;
+BEGIN
+  IF NOT public._ce_robo_ok(p_token) THEN RAISE EXCEPTION 'token_invalido'; END IF;
+  IF jsonb_typeof(p_itens) <> 'array' OR jsonb_array_length(p_itens) > 5000 THEN RAISE EXCEPTION 'itens_invalidos'; END IF;
+  SELECT EXISTS (SELECT 1 FROM public.ce_eventos WHERE instancia = p_instancia AND tipo = 'contato_novo') INTO tem_contato;
+  SELECT min(criado_em) INTO primeiro FROM public.ce_eventos WHERE instancia = p_instancia AND tipo <> 'contato_novo';
+  FOR it IN SELECT * FROM jsonb_array_elements(p_itens) LOOP
+    t := it->>'tipo';
+    BEGIN em := (it->>'em')::timestamptz; EXCEPTION WHEN others THEN CONTINUE; END;
+    IF em IS NULL OR em > now() OR em < now() - interval '400 days' THEN CONTINUE; END IF;
+    IF t = 'contato_novo' THEN
+      IF tem_contato THEN CONTINUE; END IF;
+    ELSIF t IN ('conversa_iniciada','consulta_aprovada','consulta_reprovada','consulta_analise','consulta_erro','endereco_recebido') THEN
+      IF primeiro IS NOT NULL AND em >= primeiro THEN CONTINUE; END IF;
+    ELSE CONTINUE;
+    END IF;
+    INSERT INTO public.ce_eventos (instancia, tipo, criado_em) VALUES (p_instancia, t, em);
+    n := n + 1;
+  END LOOP;
+  RETURN n;
+END $$;
+
 -- Sinal de vida. p_itens = [{"instancia":"x","conectado":true,"ativo":true}, ...]
 -- Devolve {"instancia": true/false} = se o plano está liberado (só para instâncias cadastradas no painel)
 CREATE OR REPLACE FUNCTION public.ce_robo_sinal(p_token text, p_itens jsonb)
@@ -381,10 +416,11 @@ BEGIN
   SELECT coalesce(jsonb_object_agg(tipo, n), '{}'::jsonb) INTO mes FROM (
     SELECT tipo, count(*) n FROM public.ce_eventos
      WHERE instancia = d.instancia AND criado_em > now() - interval '30 days' GROUP BY tipo) x;
-  SELECT coalesce(jsonb_agg(jsonb_build_object('dia', dia, 'conversas', c, 'aprovadas', a, 'reprovadas', r) ORDER BY dia), '[]'::jsonb)
+  SELECT coalesce(jsonb_agg(jsonb_build_object('dia', dia, 'conversas', c, 'dados', dd, 'aprovadas', a, 'reprovadas', r) ORDER BY dia), '[]'::jsonb)
     INTO serie FROM (
       SELECT g.dia::date AS dia,
-             count(e.id) FILTER (WHERE e.tipo = 'conversa_iniciada') c,
+             count(e.id) FILTER (WHERE e.tipo = 'contato_novo') c,
+             count(e.id) FILTER (WHERE e.tipo = 'conversa_iniciada') dd,
              count(e.id) FILTER (WHERE e.tipo = 'consulta_aprovada') a,
              count(e.id) FILTER (WHERE e.tipo = 'consulta_reprovada') r
         FROM generate_series((now() AT TIME ZONE 'America/Sao_Paulo')::date - 29,
@@ -636,6 +672,7 @@ END $$;
 -- ---------- Permissões ----------
 REVOKE ALL ON FUNCTION public.ce_robo_registrar(text, text, text, text, boolean) FROM public;
 REVOKE ALL ON FUNCTION public.ce_robo_evento(text, text, text) FROM public;
+REVOKE ALL ON FUNCTION public.ce_robo_importar(text, text, jsonb) FROM public;
 REVOKE ALL ON FUNCTION public.ce_robo_sinal(text, jsonb) FROM public;
 REVOKE ALL ON FUNCTION public.ce_robo_codigos(text) FROM public;
 REVOKE ALL ON FUNCTION public.ce_robo_codigo_enviado(text, bigint) FROM public;
@@ -653,6 +690,7 @@ REVOKE ALL ON FUNCTION public.ce_webhook_aplicar(jsonb) FROM public, anon, authe
 
 GRANT EXECUTE ON FUNCTION public.ce_robo_registrar(text, text, text, text, boolean) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ce_robo_evento(text, text, text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ce_robo_importar(text, text, jsonb) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ce_robo_sinal(text, jsonb) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ce_robo_codigos(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ce_robo_codigo_enviado(text, bigint) TO anon, authenticated;

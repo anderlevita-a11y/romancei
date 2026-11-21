@@ -59,7 +59,7 @@
   .tabs button{border:0;background:transparent;padding:7px 14px;border-radius:999px;font:600 .9rem "Space Grotesk",sans-serif;color:var(--roxo);cursor:pointer}
   .tabs button.at{background:var(--roxo);color:#fff}
   .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-top:14px}
-  @media(min-width:760px){.kpis{grid-template-columns:repeat(5,1fr)}}
+  @media(min-width:760px){.kpis{grid-template-columns:repeat(3,1fr)}}
   .kpi{border:1px solid var(--bd);border-radius:14px;padding:12px 14px}
   .kpi b{display:block;font-size:1.7rem;line-height:1.1;letter-spacing:-.02em}
   .kpi span{color:var(--sub);font-size:.82rem}
@@ -183,12 +183,12 @@
 
     <section class="card" id="cRes">
       <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap">
-        <div><h2>Resultados do robô</h2><p class="d" style="margin:0">Leads que mandaram dados no WhatsApp e o resultado da análise.</p></div>
+        <div><h2>Resultados do robô</h2><p class="d" style="margin:0">Quem chamou no WhatsApp, quem mandou os dados e o resultado da análise.</p></div>
         <div class="tabs"><button data-p="semana" class="at">Últimos 7 dias</button><button data-p="mes">Últimos 30 dias</button></div>
       </div>
       <div class="kpis" id="kpis"></div>
       <div class="graf"><svg id="graf" width="100%" height="190" role="img" aria-label="Conversas e aprovações por dia nos últimos 30 dias"></svg></div>
-      <div class="leg"><span><i style="background:#d9c7ef"></i>Conversas iniciadas</span><span><i style="background:var(--verde)"></i>Aprovadas</span><span><i style="background:var(--verm)"></i>Reprovadas</span></div>
+      <div class="leg"><span><i style="background:#d9c7ef"></i>Novos contatos</span><span><i style="background:var(--verde)"></i>Aprovadas</span><span><i style="background:var(--verm)"></i>Reprovadas</span></div>
     </section>
 
     <div class="grid g2">
@@ -475,10 +475,11 @@
   // ---------------- RESULTADOS ----------------
   function desenharKpis() {
     var k = dados[periodo] || {};
-    var conv = k.conversa_iniciada || 0, ap = k.consulta_aprovada || 0, rp = k.consulta_reprovada || 0,
+    var novos = k.contato_novo || 0, conv = k.conversa_iniciada || 0, ap = k.consulta_aprovada || 0, rp = k.consulta_reprovada || 0,
         an = (k.consulta_analise || 0) + (k.consulta_erro || 0), en = k.endereco_recebido || 0;
     var tot = ap + rp + an, taxa = tot ? Math.round(ap * 100 / tot) + '%' : '—';
-    var c = [['', conv, 'Conversas iniciadas'], ['ap', ap, 'Aprovadas'], ['rp', rp, 'Reprovadas'], ['', an, 'Em análise / manual'], ['', taxa, 'Taxa de aprovação · ' + en + ' com endereço']];
+    var pct = novos ? ' · ' + Math.round(conv * 100 / novos) + '%' : '';
+    var c = [['', novos, 'Novos contatos no WhatsApp'], ['', conv, 'Mandaram os dados' + pct], ['ap', ap, 'Aprovadas'], ['rp', rp, 'Reprovadas'], ['', an, 'Em análise / manual'], ['', taxa, 'Taxa de aprovação · ' + en + ' com endereço']];
     $('kpis').innerHTML = c.map(function (x) { return '<div class="kpi ' + x[0] + '"><b>' + esc(x[1]) + '</b><span>' + esc(x[2]) + '</span></div>'; }).join('');
   }
   Array.prototype.forEach.call(document.querySelectorAll('.tabs button'), function (b) {
@@ -502,7 +503,7 @@
     }
     s.forEach(function (x, i) {
       var x0 = pl + i * bw + bw * 0.12, w = bw * 0.76, wa = w * 0.42;
-      var tit = fmtData(x.dia + 'T12:00:00') + ': ' + x.conversas + ' conversas, ' + x.aprovadas + ' aprovadas, ' + x.reprovadas + ' reprovadas';
+      var tit = fmtData(x.dia + 'T12:00:00') + ': ' + x.conversas + ' novos contatos, ' + (x.dados || 0) + ' mandaram dados, ' + x.aprovadas + ' aprovadas, ' + x.reprovadas + ' reprovadas';
       o += '<g><title>' + esc(tit) + '</title>';
       if (x.conversas) o += '<rect x="' + x0 + '" y="' + y(x.conversas) + '" width="' + w + '" height="' + (y(0) - y(x.conversas)) + '" rx="3" fill="#d9c7ef"/>';
       if (x.aprovadas) o += '<rect x="' + (x0 + w * 0.06) + '" y="' + y(x.aprovadas) + '" width="' + wa + '" height="' + (y(0) - y(x.aprovadas)) + '" rx="2" fill="#10B981"/>';
