@@ -53,6 +53,13 @@ ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cashback_gerado_em
 ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS cashback_usado_em TIMESTAMPTZ;
 -- Dados que antes vinham do "Formulário para Automação" (agora tudo no cadastro do painel)
 ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS tipo_whatsapp TEXT;
+-- Quantos números de WhatsApp o distribuidor automatiza (preço: R$ 149 de ativação e R$ 50/mês por número)
+ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS qtd_numeros INT NOT NULL DEFAULT 1;
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ce_distribuidores_qtd_numeros_check') THEN
+    ALTER TABLE public.ce_distribuidores ADD CONSTRAINT ce_distribuidores_qtd_numeros_check CHECK (qtd_numeros BETWEEN 1 AND 50);
+  END IF;
+END $$;
 ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS aparelhos_conectados TEXT;
 ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS vp_analise_credito TEXT;
 ALTER TABLE public.ce_distribuidores ADD COLUMN IF NOT EXISTS apos_aprovacao TEXT;
@@ -440,7 +447,8 @@ BEGIN
   RETURN jsonb_build_object(
     'distribuidor', jsonb_build_object('nome', d.nome, 'nome_operacao', coalesce(d.nome_operacao, cad.nome_operacao),
         'telefone', d.telefone, 'instancia', d.instancia, 'cidade', coalesce(d.cidade, cad.cidade_uf),
-        'cadastro_status', cad.status, 'cadastro_em', cad.created_at, 'whatsapp_automacao', coalesce(d.whatsapp_automacao, cad.whatsapp_automacao)),
+        'cadastro_status', cad.status, 'cadastro_em', cad.created_at, 'whatsapp_automacao', coalesce(d.whatsapp_automacao, cad.whatsapp_automacao),
+        'qtd_numeros', d.qtd_numeros),
     'plano', jsonb_build_object('isento', d.isento, 'liberado', liberado,
         'ativacao_paga', d.ativacao_paga_em IS NOT NULL, 'ativacao_paga_em', d.ativacao_paga_em,
         'assinatura_status', d.assinatura_status, 'assinatura_metodo', d.assinatura_metodo,
@@ -472,7 +480,8 @@ DECLARE d public.ce_distribuidores;
 BEGIN
   d := public._ce_sessao(p_token);
   RETURN jsonb_build_object('id', d.id, 'telefone', d.telefone, 'nome', d.nome, 'email', d.email,
-    'isento', d.isento, 'ativacao_paga', d.ativacao_paga_em IS NOT NULL, 'assinatura_status', d.assinatura_status);
+    'isento', d.isento, 'ativacao_paga', d.ativacao_paga_em IS NOT NULL, 'assinatura_status', d.assinatura_status,
+    'qtd_numeros', d.qtd_numeros);
 END $$;
 
 -- Aplica um evento de webhook do AbacatePay (já validado pela function). Idempotente.
