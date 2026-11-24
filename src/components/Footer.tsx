@@ -233,7 +233,7 @@ export function Footer({ settings, onOpenAdmin, onOpenLgpd, onScrollToForm, onOp
                   <span>Painel da Distribuidora (Admin)</span>
                 </button>
                 <a
-                  href="/painel-evolution.html"
+                  href="https://consigna-evolution-app.web.app/painel.html"
                   className="w-full bg-gradient-to-r from-purple-900 to-fuchsia-700 hover:from-purple-800 hover:to-fuchsia-600 text-white p-3 rounded-2xl border border-fuchsia-400/30 flex items-center justify-center gap-2 transition-all shadow-xs font-semibold"
                 >
                   <BarChart3 className="w-3.5 h-3.5" />
