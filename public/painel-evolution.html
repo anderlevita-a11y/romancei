@@ -51,6 +51,11 @@
   .pill i{width:11px;height:11px;border-radius:50%;display:inline-block}
   .pill.on{background:#e7f8f1;color:#065f46}.pill.on i{background:var(--verde);box-shadow:0 0 0 4px rgba(16,185,129,.2)}
   .pill.off{background:#fdecec;color:#991b1b}.pill.off i{background:var(--verm)}
+  .pill.on i{animation:pulso 2s ease-in-out infinite}
+  @keyframes pulso{0%,100%{box-shadow:0 0 0 3px rgba(16,185,129,.25)}50%{box-shadow:0 0 0 7px rgba(16,185,129,.05)}}
+  .sinc{margin-left:auto;background:none;border:1px solid #d9d4e8;border-radius:999px;padding:6px 12px;font:inherit;font-size:.85rem;color:var(--sub);cursor:pointer}
+  .sinc:disabled{opacity:.6;cursor:default}.sinc.gira b{display:inline-block;animation:gira 1s linear infinite}
+  @keyframes gira{to{transform:rotate(360deg)}}
   .checks{list-style:none;margin:12px 0 0;padding:0;display:grid;gap:6px;font-size:.92rem}
   .checks li::before{content:"●";margin-right:8px}
   .checks .s::before{color:var(--verde)}.checks .n::before{color:var(--verm)}
@@ -148,6 +153,7 @@
       <div class="status">
         <span class="pill" id="pill"><i></i><span id="pillTxt">—</span></span>
         <div style="color:var(--sub);font-size:.9rem" id="statusSub"></div>
+        <button class="sinc" id="btnSinc" type="button" title="Verificar agora se o robô está ligado"><b>⟳</b> Sincronizar</button>
       </div>
       <ul class="checks" id="checks"></ul>
     </section>
@@ -320,6 +326,7 @@
     if (!t) { mostrarLogin(); return Promise.resolve(); }
     return rpc('ce_painel', { p_token: t }).then(function (d) {
       dados = d;
+      if (!statusPoll) iniciarSincronia();
       if ($('msgPainel').classList.contains('err')) msg('msgPainel');
       $('vLogin').classList.add('oculto'); $('vPainel').classList.remove('oculto'); $('sair').classList.remove('oculto');
       desenhar();
@@ -334,17 +341,7 @@
     $('sub').textContent = ds.nome_operacao || ds.nome || 'Painel do distribuidor';
     var configurado = !!r.configurado && a.status === 'ativo';
 
-    var ativo = !!r.ativo;
-    $('pill').className = 'pill ' + (ativo ? 'on' : 'off');
-    $('pillTxt').textContent = ativo ? 'Robô ATIVO' : 'Robô INATIVO';
-    $('statusSub').textContent = r.ultimo_sinal && configurado ? 'Último sinal: ' + new Date(r.ultimo_sinal).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '';
-    var it = configurado ? [
-      [!!r.online, r.online ? 'Robô ligado' : 'Robô sem sinal nos últimos 5 minutos'],
-      [!!r.whatsapp_conectado, r.whatsapp_conectado ? 'WhatsApp conectado' : 'WhatsApp desconectado: gere um novo código abaixo'],
-      [r.robo_ativo !== false, r.robo_ativo === false ? 'Robô pausado pelo suporte' : 'Atendimento automático ligado'],
-      [!!p.liberado, p.isento ? 'Plano isento' : (p.liberado ? 'Plano em dia' : 'Mensalidade pendente')]
-    ] : [[false, 'Conclua a ativação abaixo para ligar o robô']];
-    $('checks').innerHTML = it.map(function (x) { return '<li class="' + (x[0] ? 's' : 'n') + '">' + esc(x[1]) + '</li>'; }).join('');
+    desenharStatus();
 
     $('cRes').classList.toggle('oculto', !ds.instancia || a.status !== 'ativo');
     var mostrarForm = editando || !c.completo;
@@ -355,6 +352,66 @@
     desenharPassos(); desenharKpis(); desenharGrafico(); desenharCadastro(); desenharCash(); desenharPags();
     agendarAtualizacao();
   }
+
+  // ---------------- STATUS DO ROBÔ (sincronizado a cada 10 s) ----------------
+  var difRelogio = 0, statusPoll = null, ticker = null;
+  function desenharStatus() {
+    if (!dados) return;
+    var p = dados.plano || {}, r = dados.robo || {}, a = dados.ativacao || {};
+    var configurado = !!r.configurado && a.status === 'ativo';
+    var ativo = !!r.ativo;
+    $('pill').className = 'pill ' + (ativo ? 'on' : 'off');
+    $('pillTxt').textContent = ativo ? 'Robô ATIVO' : (configurado && !r.online ? 'Robô DESLIGADO' : 'Robô INATIVO');
+    $('btnSinc').classList.toggle('oculto', !configurado);
+    var it = configurado ? [
+      [!!r.online, r.online ? 'Robô ligado' : (r.desligado_em ? 'Robô desligado no computador' : 'Robô sem sinal (desligado ou sem internet)')],
+      [!!r.whatsapp_conectado, r.whatsapp_conectado ? 'WhatsApp conectado' : 'WhatsApp desconectado: gere um novo código abaixo'],
+      [r.robo_ativo !== false, r.robo_ativo === false ? 'Robô pausado pelo suporte' : 'Atendimento automático ligado'],
+      [!!p.liberado, p.isento ? 'Plano isento' : (p.liberado ? 'Plano em dia' : 'Mensalidade pendente')]
+    ] : [[false, 'Conclua a ativação abaixo para ligar o robô']];
+    $('checks').innerHTML = it.map(function (x) { return '<li class="' + (x[0] ? 's' : 'n') + '">' + esc(x[1]) + '</li>'; }).join('');
+    atualizarSub();
+  }
+  function quanto(ms) {
+    var s = Math.max(0, Math.round(ms / 1000));
+    if (s < 60) return s + ' s';
+    var m = Math.round(s / 60); if (m < 60) return m + ' min';
+    var h = Math.round(m / 60); return h < 48 ? h + ' h' : Math.round(h / 24) + ' dias';
+  }
+  function atualizarSub() {
+    var r = (dados && dados.robo) || {}, a = (dados && dados.ativacao) || {};
+    if (!(r.configurado && a.status === 'ativo') || !r.ultimo_sinal) { $('statusSub').textContent = ''; return; }
+    var agora = Date.now() + difRelogio, hora = function (t) { return new Date(t).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' }); };
+    if (r.online) $('statusSub').textContent = 'Sincronizado · último sinal há ' + quanto(agora - new Date(r.ultimo_sinal).getTime());
+    else if (r.desligado_em) $('statusSub').textContent = 'Desligado às ' + hora(r.desligado_em) + ' (há ' + quanto(agora - new Date(r.desligado_em).getTime()) + ')';
+    else $('statusSub').textContent = 'Sem sinal desde ' + hora(r.ultimo_sinal) + ' (há ' + quanto(agora - new Date(r.ultimo_sinal).getTime()) + ')';
+  }
+  function sincronizar(manual) {
+    var t = lerToken();
+    if (!t || !dados) return Promise.resolve();
+    if (manual) { $('btnSinc').disabled = true; $('btnSinc').classList.add('gira'); }
+    return rpc('ce_robo_status', { p_token: t }).then(function (st) {
+      if (st.agora) difRelogio = new Date(st.agora).getTime() - Date.now();
+      var antes = dados.robo || {}, provAntes = dados.ativacao && dados.ativacao.status;
+      var mudou = antes.online !== st.online || antes.ativo !== st.ativo || antes.whatsapp_conectado !== st.whatsapp_conectado;
+      dados.robo = st;
+      if ((st.prov_status && st.prov_status !== provAntes) || (dados.plano && st.liberado !== dados.plano.liberado)) return carregar();
+      desenharStatus();
+      if (mudou && manual !== true) $('cStatus').animate && $('cStatus').animate([{ boxShadow: '0 0 0 3px rgba(124,58,237,.35)' }, { boxShadow: '0 0 0 0 rgba(124,58,237,0)' }], 1200);
+    }).catch(function (e) {
+      if (e.codigo === 'sessao_invalida') { gravarToken(''); mostrarLogin(); }
+    }).then(function () {
+      if (manual) { $('btnSinc').disabled = false; $('btnSinc').classList.remove('gira'); }
+    });
+  }
+  function iniciarSincronia() {
+    clearInterval(statusPoll); clearInterval(ticker);
+    statusPoll = setInterval(function () { if (!document.hidden) sincronizar(false); }, 10000);
+    ticker = setInterval(atualizarSub, 1000);
+  }
+  $('btnSinc').onclick = function () { sincronizar(true).then(function () { return carregar(); }); };
+  document.addEventListener('visibilitychange', function () { if (!document.hidden && dados) sincronizar(false); });
+  window.addEventListener('online', function () { if (dados) sincronizar(false); });
 
   // Atualiza sozinho enquanto o robô está se configurando ou esperando o pagamento
   function agendarAtualizacao() {

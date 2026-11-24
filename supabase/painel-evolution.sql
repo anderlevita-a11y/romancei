@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS public.ce_status_robo (
     whatsapp_conectado BOOLEAN,
     robo_ativo BOOLEAN
 );
+ALTER TABLE public.ce_status_robo ADD COLUMN IF NOT EXISTS desligado_em TIMESTAMPTZ;
 
 -- ---------- Códigos de login (enviados pelo robô no WhatsApp) ----------
 CREATE TABLE IF NOT EXISTS public.ce_codigos (
@@ -291,7 +292,8 @@ BEGIN
     INSERT INTO public.ce_status_robo (instancia, ultimo_sinal, whatsapp_conectado, robo_ativo)
     VALUES (it->>'instancia', now(), (it->>'conectado')::boolean, (it->>'ativo')::boolean)
     ON CONFLICT (instancia) DO UPDATE
-       SET ultimo_sinal = now(), whatsapp_conectado = EXCLUDED.whatsapp_conectado, robo_ativo = EXCLUDED.robo_ativo;
+       SET ultimo_sinal = now(), whatsapp_conectado = EXCLUDED.whatsapp_conectado, robo_ativo = EXCLUDED.robo_ativo,
+           desligado_em = NULL;
     SELECT * INTO d FROM public.ce_distribuidores WHERE instancia = it->>'instancia';
     IF d.id IS NOT NULL THEN
       res := res || jsonb_build_object(d.instancia, public._ce_liberado(d));
@@ -305,6 +307,41 @@ BEGIN
   DELETE FROM public.ce_codigos WHERE criado_em < now() - interval '1 day';
   DELETE FROM public.ce_sessoes WHERE expira_em < now();
   RETURN res;
+END $$;
+
+-- O robô avisa que está sendo encerrado (painel mostra INATIVO na hora)
+CREATE OR REPLACE FUNCTION public.ce_robo_desligar(p_token text, p_instancias text[])
+RETURNS integer LANGUAGE plpgsql VOLATILE SECURITY DEFINER SET search_path = public AS $$
+DECLARE n integer;
+BEGIN
+  IF NOT public._ce_robo_ok(p_token) THEN RAISE EXCEPTION 'token_invalido'; END IF;
+  UPDATE public.ce_status_robo SET desligado_em = now() WHERE instancia = ANY(coalesce(p_instancias, '{}'));
+  GET DIAGNOSTICS n = ROW_COUNT;
+  RETURN n;
+END $$;
+
+-- Online = sinal nos últimos 90 s (o robô manda a cada 20 s) e não avisou que desligou
+CREATE OR REPLACE FUNCTION public._ce_robo_json(d public.ce_distribuidores)
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE st public.ce_status_robo; online boolean; liberado boolean;
+BEGIN
+  liberado := public._ce_liberado(d);
+  SELECT * INTO st FROM public.ce_status_robo WHERE instancia = d.instancia;
+  online := d.instancia IS NOT NULL AND st.instancia IS NOT NULL AND st.desligado_em IS NULL
+            AND st.ultimo_sinal > now() - interval '90 seconds';
+  RETURN jsonb_build_object('configurado', d.instancia IS NOT NULL, 'online', coalesce(online, false),
+      'whatsapp_conectado', st.whatsapp_conectado, 'robo_ativo', st.robo_ativo, 'ultimo_sinal', st.ultimo_sinal,
+      'desligado_em', st.desligado_em, 'liberado', liberado, 'agora', now(),
+      'ativo', coalesce(online, false) AND coalesce(st.whatsapp_conectado, false) AND coalesce(st.robo_ativo, false) AND liberado);
+END $$;
+
+-- Consulta leve que o painel faz a cada poucos segundos (sincronização do status do robô)
+CREATE OR REPLACE FUNCTION public.ce_robo_status(p_token text)
+RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path = public AS $$
+DECLARE d public.ce_distribuidores;
+BEGIN
+  d := public._ce_sessao(p_token);
+  RETURN public._ce_robo_json(d) || jsonb_build_object('prov_status', d.prov_status);
 END $$;
 
 -- Códigos de login esperando envio
@@ -414,8 +451,6 @@ BEGIN
   d := public._ce_sessao(p_token);
   liberado := public._ce_liberado(d);
   SELECT * INTO st FROM public.ce_status_robo WHERE instancia = d.instancia;
-  online := st.instancia IS NOT NULL AND st.ultimo_sinal > now() - interval '5 minutes';
-  IF d.instancia IS NULL THEN online := false; END IF;
   -- sempre executa (sem linha, os campos ficam nulos e o registro fica definido)
   SELECT a.nome_operacao, a.cidade_uf, a.status, a.whatsapp_automacao, a.created_at INTO cad
     FROM public.automacao_cadastros a WHERE a.id = d.cadastro_id;
@@ -453,9 +488,7 @@ BEGIN
         'ativacao_paga', d.ativacao_paga_em IS NOT NULL, 'ativacao_paga_em', d.ativacao_paga_em,
         'assinatura_status', d.assinatura_status, 'assinatura_metodo', d.assinatura_metodo,
         'ultimo_pagamento_em', d.ultimo_pagamento_em, 'falhas_pagamento', d.falhas_pagamento),
-    'robo', jsonb_build_object('configurado', d.instancia IS NOT NULL, 'online', online,
-        'whatsapp_conectado', st.whatsapp_conectado, 'robo_ativo', st.robo_ativo, 'ultimo_sinal', st.ultimo_sinal,
-        'ativo', online AND coalesce(st.whatsapp_conectado, false) AND coalesce(st.robo_ativo, false) AND liberado),
+    'robo', public._ce_robo_json(d),
     'semana', semana, 'mes', mes, 'serie', serie, 'pagamentos', pags,
     'cadastro', jsonb_build_object('nome', d.nome, 'nome_operacao', d.nome_operacao, 'email', d.email, 'cidade', d.cidade,
         'whatsapp_automacao', d.whatsapp_automacao, 'whatsapp_avisos', d.whatsapp_avisos, 'vp_usuario', d.vp_usuario,
@@ -715,6 +748,11 @@ GRANT EXECUTE ON FUNCTION public.ce_robo_ativacao_status(text, uuid, text, text,
 GRANT EXECUTE ON FUNCTION public.ce_entrar(text, text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ce_sair(text) TO anon, authenticated;
 GRANT EXECUTE ON FUNCTION public.ce_painel(text) TO anon, authenticated;
+REVOKE ALL ON FUNCTION public.ce_robo_status(text) FROM public;
+REVOKE ALL ON FUNCTION public.ce_robo_desligar(text, text[]) FROM public;
+GRANT EXECUTE ON FUNCTION public.ce_robo_status(text) TO anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.ce_robo_desligar(text, text[]) TO anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public._ce_robo_json(public.ce_distribuidores) FROM PUBLIC, anon, authenticated;
 DO $$ BEGIN
   IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'service_role') THEN
     EXECUTE 'GRANT EXECUTE ON FUNCTION public.ce_sessao_info(text) TO service_role';
